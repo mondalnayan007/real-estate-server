@@ -15,9 +15,21 @@ async function connectToMongoDB() {
     try {
         await client.connect();
 
+        const db = client.db('realEstate');
+        const projectsCollection = db.collection('projects');
+
+
+
         app.get('/projects', async (req, res) => {
             const cursor = projectsCollection.find();
             const result = await cursor.toArray();
+            res.send(result);
+        })
+
+
+        app.post('/projects',async(req,res)=>{
+            const projectData = req.body;
+            const result = await projectsCollection.insertOne(projectData);
             res.send(result);
         })
 
