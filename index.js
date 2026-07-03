@@ -17,14 +17,17 @@ async function connectToMongoDB() {
 
         const db = client.db('realEstate');
         const projectsCollection = db.collection('projects');
+        const settingsCollection = db.collection('settings');
 
 
-
+         // get all proects
         app.get('/projects', async (req, res) => {
             const cursor = projectsCollection.find();
             const result = await cursor.toArray();
             res.send(result);
         })
+
+        // get single project 
 
         app.get('/projects/:id',async(req,res)=>{
             const  id = req.params.id;
@@ -33,12 +36,23 @@ async function connectToMongoDB() {
             res.send(result);
         })
 
-
+    //   add projects 
         app.post('/projects',async(req,res)=>{
             const projectData = req.body;
             const result = await projectsCollection.insertOne(projectData);
             res.send(result);
         })
+
+        // setting data 
+
+        app.post('/settings',async(req,res)=>{
+            const settingsData = req.body;
+            const result = await settingsCollection.insertOne(settingsData);
+            res.send(result);
+        })
+
+
+
 
 
 
