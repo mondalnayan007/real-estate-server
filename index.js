@@ -36,6 +36,16 @@ async function connectToMongoDB() {
             res.send(result);
         })
 
+
+        // get the settings based on the email/domain name
+        
+        app.get('/settings', async(req,res)=>{
+            const {email} = req.query;
+            const query = {email : email};
+            const result = await settingsCollection.findOne(query);
+            res.send(result);
+        })
+
     //   add projects 
         app.post('/projects',async(req,res)=>{
             const projectData = req.body;
@@ -50,6 +60,8 @@ async function connectToMongoDB() {
             const result = await settingsCollection.insertOne(settingsData);
             res.send(result);
         })
+
+
 
 
 
