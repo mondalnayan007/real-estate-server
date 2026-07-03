@@ -6,6 +6,15 @@ const port = process.env.PORT || 3000
 
 
 app.use(cors());
+app.use(express.json());
+
+
+
+app.get('/projects', async(req,res)=>{
+    const cursor = projectsCollection.find();
+    const result = await cursor.toArray();
+    res.send(result) ;
+})
 
 
 app.get('/', (req, res) => {
