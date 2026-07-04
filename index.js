@@ -62,6 +62,16 @@ async function connectToMongoDB() {
         })
 
 
+        // delete any project 
+
+        app.delete('/projects/:id',async(req,res)=>{
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)};
+            const result = await projectsCollection.deleteOne(query);
+            res.send(result);
+        })
+
+
 
 
         console.log("You successfully connected to MongoDB!");
