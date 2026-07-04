@@ -70,12 +70,25 @@ async function connectToMongoDB() {
             const updatedData = req.body;
             const update = {
                 $set:updatedData
-                           
-                   
-
+             
             }
             const options = {};
             const result = await projectsCollection.updateOne(query,update,options);
+            res.send(result);
+
+        })
+        // update the settings
+
+        app.patch('/settings',async(req,res)=>{
+            const email = req.query.email;
+            const query = {email: email};
+            const updatedData = req.body;
+            const update = {
+                $set:updatedData
+             
+            }
+            const options = {};
+            const result = await settingsCollection.updateOne(query,update,options);
             res.send(result);
 
         })
