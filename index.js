@@ -62,6 +62,24 @@ async function connectToMongoDB() {
         })
 
 
+        // update the projects data 
+
+        app.patch('/projects/:id',async(req,res)=>{
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)};
+            const updatedData = req.body;
+            const update = {
+                $set:updatedData
+                           
+                   
+
+            }
+            const options = {};
+            const result = await projectsCollection.updateOne(query,update,options);
+            res.send(result);
+
+        })
+
         // delete any project 
 
         app.delete('/projects/:id',async(req,res)=>{
