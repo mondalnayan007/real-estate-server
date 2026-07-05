@@ -53,7 +53,7 @@ async function connectToMongoDB() {
         app.get('/slider',async(req,res)=>{
             const  {domain} = req.query;
             const query = {domain:domain};
-            const result = await slidersCollection.find(query);
+            const result = await slidersCollection.find(query).toArray();
             res.send(result);
 
         })
