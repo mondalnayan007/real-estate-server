@@ -21,6 +21,11 @@ async function connectToMongoDB() {
         const slidersCollection = db.collection('sliders');
 
 
+
+                                         //  Get apis here  
+
+
+
          // get all proects
         app.get('/projects', async (req, res) => {
             const cursor = projectsCollection.find();
@@ -58,6 +63,18 @@ async function connectToMongoDB() {
 
         })
 
+
+        // get  testimonial data
+
+        app.get('/testimonial',async(req,res)=>{
+        
+        })
+
+
+                                  // post apis here 
+
+
+
     //   add projects 
         app.post('/projects',async(req,res)=>{
             const projectData = req.body;
@@ -65,7 +82,7 @@ async function connectToMongoDB() {
             res.send(result);
         })
 
-        // setting data 
+        // add setting data 
 
         app.post('/settings',async(req,res)=>{
             const settingsData = req.body;
@@ -81,6 +98,10 @@ async function connectToMongoDB() {
             const result = await slidersCollection.insertOne(sliderData);
             res.send(result);
         })
+
+
+
+                                //   update/patch apis 
 
 
         // update the projects data 
@@ -129,6 +150,11 @@ async function connectToMongoDB() {
             res.send(result);
 
         })
+
+
+
+                                     //   delete apis here 
+
 
         // delete any project 
 
