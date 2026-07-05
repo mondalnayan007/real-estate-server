@@ -114,6 +114,24 @@ async function connectToMongoDB() {
 
         })
 
+        // update any slider data 
+
+        app.patch('/slider',async(req,res)=>{
+            const {domain,id}= req.query;
+            const updatedData = req.body;
+            const query = {domain:domain, _id: new ObjectId(id)};
+
+            const update = {
+                $set:{
+                    updatedData
+                }
+            }
+            const options = {};
+            const result = await slidersCollection.updateOne(query,update,options);
+            res.send(result);
+
+        })
+
         // delete any project 
 
         app.delete('/projects/:id',async(req,res)=>{
