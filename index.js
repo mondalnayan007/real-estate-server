@@ -18,6 +18,7 @@ async function connectToMongoDB() {
         const db = client.db('realEstate');
         const projectsCollection = db.collection('projects');
         const settingsCollection = db.collection('settings');
+        const slidersCollection = db.collection('sliders');
 
 
          // get all proects
@@ -58,6 +59,15 @@ async function connectToMongoDB() {
         app.post('/settings',async(req,res)=>{
             const settingsData = req.body;
             const result = await settingsCollection.insertOne(settingsData);
+            res.send(result);
+        })
+
+
+        // add slider data 
+
+        app.post('/slider',async(req,res)=>{
+            const sliderData = req.body;
+            const result = await slidersCollection.insertOne(sliderData);
             res.send(result);
         })
 
