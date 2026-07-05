@@ -122,9 +122,7 @@ async function connectToMongoDB() {
             const query = {domain:domain, _id: new ObjectId(id)};
 
             const update = {
-                $set:{
-                    updatedData
-                }
+                $set:updatedData
             }
             const options = {};
             const result = await slidersCollection.updateOne(query,update,options);
