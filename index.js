@@ -47,6 +47,17 @@ async function connectToMongoDB() {
             res.send(result);
         })
 
+
+        // get the slider data 
+
+        app.get('/slider',async(req,res)=>{
+            const  {domain} = req.query;
+            const query = {domain:domain};
+            const result = await slidersCollection.find(query);
+            res.send(result);
+
+        })
+
     //   add projects 
         app.post('/projects',async(req,res)=>{
             const projectData = req.body;
