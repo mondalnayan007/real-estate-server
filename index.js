@@ -42,6 +42,15 @@ async function connectToMongoDB() {
             res.send(result);
         })
 
+        // find projects based on the domain 
+
+        app.get('/projects',async(req,res)=>{
+            const {domain} = req.query;
+            const query = {domain: domain};
+            const result = await projectsCollection.find(query).toArray();
+            res.send(result); 
+        })
+
 
         // get the settings based on the email/domain name
         
