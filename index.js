@@ -104,8 +104,8 @@ async function connectToMongoDB() {
         app.post('/projects', uploadImagesMiddleware, async (req, res) => {
             try {
                 // ১. টেক্সট ডাটা আলাদা করা
-                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities,domain } = req.body;
-              console.log(domain);
+                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities} = req.body;
+             
                 // ২. আলাদা ফাইলে তৈরি করা ফাংশন দিয়ে ক্লাউডিনারিতে আপলোড ও URL আনা
                 const imageUrls = await uploadToCloudinary(req.files);
 
@@ -129,7 +129,7 @@ async function connectToMongoDB() {
                     // প্রথম ইমেজটি মেইন 'img' ফিল্ডে যাবে
                     img: imageUrls.length > 0 ? imageUrls[0] : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
                     allImages: imageUrls,
-                    domain
+                    domain: req.body.domain
                 };
 
                 // console.log(finalProjectData.domain);
