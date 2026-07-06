@@ -22,41 +22,56 @@ async function connectToMongoDB() {
 
 
 
-                                         //  Get apis here  
+        //  Get apis here  
 
 
 
-         // get all proects
-        app.get('/projects', async (req, res) => {
-            const cursor = projectsCollection.find();
-            const result = await cursor.toArray();
-            res.send(result);
-        })
+        // get all proects
+        // app.get('/projects', async (req, res) => {
+        //     const cursor = projectsCollection.find();
+        //     const result = await cursor.toArray();
+        //     res.send(result);
+        // })
 
         // get single project 
 
-        app.get('/projects/:id',async(req,res)=>{
-            const  id = req.params.id;
-            const query = {_id: new ObjectId(id)};
-            const result = await projectsCollection.findOne(query);
-            res.send(result);
-        })
+        app.get('/projects', async (req, res) => {
+            try {
+                const { domain, id } = req.query;
 
-        // find projects based on the domain 
+                if (domain && id) {
+                    const query = { domain: domain, _id: new ObjectId(id) };
+                    const result = await projectsCollection.findOne(query);
 
-        app.get('/projects',async(req,res)=>{
-            const {domain} = req.query;
-            const query = {domain: domain};
-            const result = await projectsCollection.find(query).toArray();
-            res.send(result); 
-        })
+                    if (!result) {
+                        return res.status(404).send({ message: "We dont get the project" });
+                    }
+                    return res.send(result);
+                }
+
+               
+                if (domain) {
+                    const query = { domain: domain };
+                    const result = await projectsCollection.find(query).toArray();
+                    return res.send(result);
+                }
+
+                
+                const result = await projectsCollection.find().toArray();
+                res.send(result);
+
+            } catch (error) {
+                console.error(error);
+                res.status(500).send({ message: "Server error", error });
+            }
+        });
 
 
         // get the settings based on the email/domain name
-        
-        app.get('/settings', async(req,res)=>{
-            const {email} = req.query;
-            const query = {email : email};
+
+        app.get('/settings', async (req, res) => {
+            const { email } = req.query;
+            const query = { email: email };
             const result = await settingsCollection.findOne(query);
             res.send(result);
         })
@@ -64,9 +79,9 @@ async function connectToMongoDB() {
 
         // get the slider data 
 
-        app.get('/slider',async(req,res)=>{
-            const  {domain} = req.query;
-            const query = {domain:domain};
+        app.get('/slider', async (req, res) => {
+            const { domain } = req.query;
+            const query = { domain: domain };
             const result = await slidersCollection.find(query).toArray();
             res.send(result);
 
@@ -75,17 +90,17 @@ async function connectToMongoDB() {
 
         // get  testimonial data
 
-        app.get('/testimonial',async(req,res)=>{
-        
+        app.get('/testimonial', async (req, res) => {
+
         })
 
 
-                                  // post apis here 
+        // post apis here 
 
 
 
-    //   add projects 
-        app.post('/projects',async(req,res)=>{
+        //   add projects 
+        app.post('/projects', async (req, res) => {
             const projectData = req.body;
             const result = await projectsCollection.insertOne(projectData);
             res.send(result);
@@ -93,7 +108,7 @@ async function connectToMongoDB() {
 
         // add setting data 
 
-        app.post('/settings',async(req,res)=>{
+        app.post('/settings', async (req, res) => {
             const settingsData = req.body;
             const result = await settingsCollection.insertOne(settingsData);
             res.send(result);
@@ -102,7 +117,7 @@ async function connectToMongoDB() {
 
         // add slider data 
 
-        app.post('/slider',async(req,res)=>{
+        app.post('/slider', async (req, res) => {
             const sliderData = req.body;
             const result = await slidersCollection.insertOne(sliderData);
             res.send(result);
@@ -110,66 +125,66 @@ async function connectToMongoDB() {
 
 
 
-                                //   update/patch apis 
+        //   update/patch apis 
 
 
         // update the projects data 
 
-        app.patch('/projects/:id',async(req,res)=>{
+        app.patch('/projects/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const updatedData = req.body;
             const update = {
-                $set:updatedData
-             
+                $set: updatedData
+
             }
             const options = {};
-            const result = await projectsCollection.updateOne(query,update,options);
+            const result = await projectsCollection.updateOne(query, update, options);
             res.send(result);
 
         })
         // update the settings
 
-        app.patch('/settings',async(req,res)=>{
+        app.patch('/settings', async (req, res) => {
             const email = req.query.email;
-            const query = {email: email};
+            const query = { email: email };
             const updatedData = req.body;
             const update = {
-                $set:updatedData
-             
+                $set: updatedData
+
             }
             const options = {};
-            const result = await settingsCollection.updateOne(query,update,options);
+            const result = await settingsCollection.updateOne(query, update, options);
             res.send(result);
 
         })
 
         // update any slider data 
 
-        app.patch('/slider',async(req,res)=>{
-            const {domain,id}= req.query;
+        app.patch('/slider', async (req, res) => {
+            const { domain, id } = req.query;
             const updatedData = req.body;
-            const query = {domain:domain, _id: new ObjectId(id)};
+            const query = { domain: domain, _id: new ObjectId(id) };
 
             const update = {
-                $set:updatedData
+                $set: updatedData
             }
             const options = {};
-            const result = await slidersCollection.updateOne(query,update,options);
+            const result = await slidersCollection.updateOne(query, update, options);
             res.send(result);
 
         })
 
 
 
-                                     //   delete apis here 
+        //   delete apis here 
 
 
         // delete any project 
 
-        app.delete('/projects/:id',async(req,res)=>{
+        app.delete('/projects/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const result = await projectsCollection.deleteOne(query);
             res.send(result);
         })
