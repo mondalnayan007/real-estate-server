@@ -4,6 +4,7 @@ const cors = require('cors');
 const app = express()
 const port = process.env.PORT || 3000
 const { MongoClient, ObjectId } = require('mongodb');
+const { uploadImagesMiddleware, uploadToCloudinary } = require('./utils/CloudinaryConfig');
 
 
 app.use(cors());
@@ -49,14 +50,14 @@ async function connectToMongoDB() {
                     return res.send(result);
                 }
 
-               
+
                 if (domain) {
                     const query = { domain: domain };
                     const result = await projectsCollection.find(query).toArray();
                     return res.send(result);
                 }
 
-                
+
                 const result = await projectsCollection.find().toArray();
                 res.send(result);
 
@@ -100,11 +101,52 @@ async function connectToMongoDB() {
 
 
         //   add projects 
-        app.post('/projects', async (req, res) => {
-            const projectData = req.body;
-            const result = await projectsCollection.insertOne(projectData);
-            res.send(result);
-        })
+        app.post('/projects', uploadImagesMiddleware, async (req, res) => {
+            try {
+                // ১. টেক্সট ডাটা আলাদা করা
+                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities } = req.body;
+
+                // ২. আলাদা ফাইলে তৈরি করা ফাংশন দিয়ে ক্লাউডিনারিতে আপলোড ও URL আনা
+                const imageUrls = await uploadToCloudinary(req.files);
+
+                // ৩. Amenities পার্স করা
+                let parsedAmenities = amenities ? JSON.parse(amenities) : [];
+
+                // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
+                const finalProjectData = {
+                    title,
+                    price,
+                    location,
+                    category,
+                    tag,
+                    beds: Number(beds) || 0,
+                    baths: Number(baths) || 0,
+                    sqft,
+                    status,
+                    description,
+                    videoLink,
+                    amenities: parsedAmenities,
+                    // প্রথম ইমেজটি মেইন 'img' ফিল্ডে যাবে
+                    img: imageUrls.length > 0 ? imageUrls[0] : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
+                    allImages: imageUrls
+                };
+
+                // ৫. ডাটাবেজে ইনসার্ট
+                const result = await projectsCollection.insertOne(finalProjectData);
+
+                // ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ অবজেক্ট পাঠানো
+                const savedProject = {
+                    _id: result.insertedId,
+                    ...finalProjectData
+                };
+
+                res.status(201).send(savedProject);
+
+            } catch (error) {
+                console.error("Error in /projects route:", error);
+                res.status(500).send({ error: true, message: "Internal Server Error" });
+            }
+        });
 
         // add setting data 
 
