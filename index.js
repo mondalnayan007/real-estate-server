@@ -105,7 +105,7 @@ async function connectToMongoDB() {
             try {
                 // ১. টেক্সট ডাটা আলাদা করা
                 const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities,domain} = req.body;
-              console.log(req.body);
+             
                 // ২. আলাদা ফাইলে তৈরি করা ফাংশন দিয়ে ক্লাউডিনারিতে আপলোড ও URL আনা
                 const imageUrls = await uploadToCloudinary(req.files);
 
@@ -175,9 +175,10 @@ async function connectToMongoDB() {
 
         // update the projects data 
 
-        app.patch('/projects/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: new ObjectId(id) };
+        app.patch('/projects', async (req, res) => {
+            const id = req.query.id;
+            const domain = req.query.domain
+            const query = {domain:domain, _id: new ObjectId(id) };
             const updatedData = req.body;
             const update = {
                 $set: updatedData
