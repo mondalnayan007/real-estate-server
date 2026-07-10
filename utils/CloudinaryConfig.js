@@ -15,6 +15,11 @@ cloudinary.config({
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+const settingsUploadMiddleware = upload.fields([
+    { name: "logo", maxCount: 1 },
+    { name: "favIcon", maxCount: 1 }
+]);
+
 // ইমেজের নাম ফ্রন্টএন্ডে 'images' দেওয়া, তাই এটি মিডলওয়্যার হিসেবে কাজ করবে
 const uploadImagesMiddleware = upload.array('images');
 
@@ -41,5 +46,6 @@ const uploadToCloudinary = async (files) => {
 // require স্টাইলে এক্সপোর্ট করার নিয়ম
 module.exports = {
   uploadImagesMiddleware,
-  uploadToCloudinary
+  uploadToCloudinary,
+  settingsUploadMiddleware
 };
