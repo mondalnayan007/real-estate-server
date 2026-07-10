@@ -71,8 +71,8 @@ async function connectToMongoDB() {
         // get the settings based on the email/domain name
 
         app.get('/settings', async (req, res) => {
-            const { email } = req.query;
-            const query = { email: email };
+            const { domain } = req.query;
+            const query = { domain: domain };
             const result = await settingsCollection.findOne(query);
             res.send(result);
         })
