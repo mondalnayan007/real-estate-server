@@ -104,8 +104,8 @@ async function connectToMongoDB() {
         app.post('/projects', uploadImagesMiddleware, async (req, res) => {
             try {
                 // ১. টেক্সট ডাটা আলাদা করা
-                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities,domain} = req.body;
-             
+                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities, domain } = req.body;
+
                 // ২. আলাদা ফাইলে তৈরি করা ফাংশন দিয়ে ক্লাউডিনারিতে আপলোড ও URL আনা
                 const imageUrls = await uploadToCloudinary(req.files);
 
@@ -129,7 +129,7 @@ async function connectToMongoDB() {
                     // প্রথম ইমেজটি মেইন 'img' ফিল্ডে যাবে
                     img: imageUrls.length > 0 ? imageUrls[0] : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
                     allImages: imageUrls,
-                    domain:req.body.domain
+                    domain: req.body.domain
                 };
 
                 // console.log(finalProjectData.domain);
@@ -153,46 +153,46 @@ async function connectToMongoDB() {
 
         // add setting data 
 
-       app.post('/settings', settingsUploadMiddleware, async (req, res) => {
-  try {
-    
-    const settingsData = { ...req.body };
+        app.post('/settings', settingsUploadMiddleware, async (req, res) => {
+            try {
 
-   
-    if (req.files && req.files['logo']) {
-      const logoFile = req.files['logo']; 
-      const logoUrlResult = await uploadToCloudinary(logoFile);
-      if (logoUrlResult.length > 0) {
-        settingsData.logo = logoUrlResult[0]; 
-      }
-    }
+                const settingsData = { ...req.body };
 
-  
-    if (req.files && req.files['favIcon']) {
-      const favIconFile = req.files['favIcon'];
-      const favIconUrlResult = await uploadToCloudinary(favIconFile);
-      if (favIconUrlResult.length > 0) {
-        settingsData.favIcon = favIconUrlResult[0]; 
-      }
-    }
 
-    
-    
-  
+                if (req.files && req.files['logo']) {
+                    const logoFile = req.files['logo'];
+                    const logoUrlResult = await uploadToCloudinary(logoFile);
+                    if (logoUrlResult.length > 0) {
+                        settingsData.logo = logoUrlResult[0];
+                    }
+                }
 
-    const result = await settingsCollection.insertOne(settingsData);
 
-    res.status(200).send({
-      success: true,
-      message: "Settings successfully saved with Cloudinary links!",
-      data: result
-    });
+                if (req.files && req.files['favIcon']) {
+                    const favIconFile = req.files['favIcon'];
+                    const favIconUrlResult = await uploadToCloudinary(favIconFile);
+                    if (favIconUrlResult.length > 0) {
+                        settingsData.favIcon = favIconUrlResult[0];
+                    }
+                }
 
-  } catch (error) {
-    console.error("Backend Error:", error);
-    res.status(500).send({ success: false, message: "Internal Server Error" });
-  }
-});
+
+
+
+
+                const result = await settingsCollection.insertOne(settingsData);
+
+                res.status(200).send({
+                    success: true,
+                    message: "Settings successfully saved with Cloudinary links!",
+                    data: result
+                });
+
+            } catch (error) {
+                console.error("Backend Error:", error);
+                res.status(500).send({ success: false, message: "Internal Server Error" });
+            }
+        });
 
 
         // add slider data 
@@ -213,7 +213,7 @@ async function connectToMongoDB() {
         app.patch('/projects', async (req, res) => {
             const id = req.query.id;
             const domain = req.query.domain
-            const query = {domain:domain, _id: new ObjectId(id) };
+            const query = { domain: domain, _id: new ObjectId(id) };
             const updatedData = req.body;
             const update = {
                 $set: updatedData
