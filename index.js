@@ -153,11 +153,51 @@ async function connectToMongoDB() {
 
         // add setting data 
 
-        app.post('/settings', async (req, res) => {
-            const settingsData = req.body;
-            const result = await settingsCollection.insertOne(settingsData);
-            res.send(result);
-        })
+       app.post('/settings', uploadImagesMiddleware, async (req, res) => {
+  try {
+    // সব টেক্সট ডেটা থাকবে req.body তে
+    const settingsData = { ...req.body };
+
+    // ২. লোগো আপলোড হ্যান্ডেল করা
+    if (req.files && req.files['logo']) {
+      const logoFile = req.files['logo']; // এটি একটি অ্যারে হিসেবে আসে
+      const logoUrlResult = await uploadToCloudinary(logoFile);
+      if (logoUrlResult.length > 0) {
+        settingsData.logo = logoUrlResult[0]; // ক্লাউডিনারির লাইভ লিংকটি বসালাম
+      }
+    }
+
+    // ৩. ফেভআইকন আপলোড হ্যান্ডেল করা
+    if (req.files && req.files['favIcon']) {
+      const favIconFile = req.files['favIcon'];
+      const favIconUrlResult = await uploadToCloudinary(favIconFile);
+      if (favIconUrlResult.length > 0) {
+        settingsData.favIcon = favIconUrlResult[0]; // ক্লাউডিনারির লাইভ লিংকটি বসালাম
+      }
+    }
+
+    // ৪. যদি কোনো নতুন ফাইল আপলোড না করা হয়, তবে ফ্রন্টএন্ড থেকে আসা আগের স্ট্রিং/লিংকটাই থেকে যাবে
+    // (কারণ আমরা ফ্রন্টএন্ডে অবজেক্ট লুপ করে ফাঁকা না থাকলে পাঠিয়ে দিচ্ছি)
+
+    // ৫. ডাটাবেজে সেভ করা (গ্লোবাল সেটিংসের জন্য এটি সবসময় একটা নির্দিষ্ট ডকুমেন্টকে আপডেট বা ক্রিয়েট করবে)
+    // এর ফলে ডাটাবেজে ডাটা ডুপ্লিকেট হবে না, ১টা রো-তেই সব আপডেট হবে।
+    const query = {}; // ফাঁকা অবজেক্ট মানে প্রথম যে ডকুমেন্ট পাবে সেটাতেই কাজ করবে
+    const updateDoc = { $set: settingsData };
+    const options = { upsert: true, returnDocument: 'after' }; // ডাটা না থাকলে নতুন বানাবে
+
+    const result = await settingsCollection.findOneAndUpdate(query, updateDoc, options);
+
+    res.status(200).send({
+      success: true,
+      message: "Settings successfully saved with Cloudinary links!",
+      data: result
+    });
+
+  } catch (error) {
+    console.error("Backend Error:", error);
+    res.status(500).send({ success: false, message: "Internal Server Error" });
+  }
+});
 
 
         // add slider data 
