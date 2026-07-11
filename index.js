@@ -221,7 +221,7 @@ async function connectToMongoDB() {
                     photo: photoUrl, // ক্লাউডিনারির Image URL
                     createdAt: new Date()
                 };
-                console.log(sliderData);
+                
 
                 const result = await slidersCollection.insertOne(sliderData);
                 res.status(201).send(result);
