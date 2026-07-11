@@ -45,6 +45,7 @@ const uploadToCloudinary = async (files) => {
 
 // require স্টাইলে এক্সপোর্ট করার নিয়ম
 module.exports = {
+  upload,
   uploadImagesMiddleware,
   uploadToCloudinary,
   settingsUploadMiddleware

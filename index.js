@@ -4,7 +4,7 @@ const cors = require('cors');
 const app = express()
 const port = process.env.PORT || 3000
 const { MongoClient, ObjectId } = require('mongodb');
-const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware } = require('./utils/CloudinaryConfig');
+const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware, upload } = require('./utils/CloudinaryConfig');
 
 
 app.use(cors());
@@ -197,12 +197,40 @@ async function connectToMongoDB() {
 
         // add slider data 
 
-        app.post('/slider', async (req, res) => {
-            const sliderData = req.body;
-            const result = await slidersCollection.insertOne(sliderData);
-            res.send(result);
-        })
+        // 🚀 POST: স্লাইডার ক্রিয়েট API (Cloudinary Integration সহ)
+        app.post('/slider', upload.single('photo'), async (req, res) => {
+            try {
+                const { headerTitle, title, description, position,domain } = req.body;
+                let photoUrl = '';
 
+                // যদি ফ্রন্টএন্ড থেকে ফাইল আসে, ক্লাউডিনারিতে আপলোড হবে
+                if (req.file) {
+                    const uploadedUrls = await uploadToCloudinary([req.file]);
+                    if (uploadedUrls.length > 0) {
+                        photoUrl = uploadedUrls[0];
+                    }
+                }
+
+                // ডেটাবেজে সেভ করার অবজেক্ট
+                const sliderData = {
+                    headerTitle,
+                    title,
+                    description,
+                    position,
+                    domain:req.body.domain,
+                    photo: photoUrl, // ক্লাউডিনারির Image URL
+                    createdAt: new Date()
+                };
+                console.log(sliderData);
+
+                const result = await slidersCollection.insertOne(sliderData);
+                res.status(201).send(result);
+
+            } catch (error) {
+                console.error("Error creating slider:", error);
+                res.status(500).send({ message: "Failed to upload and save slider", error: error.message });
+            }
+        });
 
 
         //   update/patch apis 
