@@ -200,7 +200,7 @@ async function connectToMongoDB() {
         // 🚀 POST: স্লাইডার ক্রিয়েট API (Cloudinary Integration সহ)
         app.post('/slider', upload.single('photo'), async (req, res) => {
             try {
-                const { headerTitle, title, description, position,domain } = req.body;
+                const { headerTitle, title, description, position, domain } = req.body;
                 let photoUrl = '';
 
                 // যদি ফ্রন্টএন্ড থেকে ফাইল আসে, ক্লাউডিনারিতে আপলোড হবে
@@ -217,11 +217,11 @@ async function connectToMongoDB() {
                     title,
                     description,
                     position,
-                    domain:req.body.domain,
+                    domain: req.body.domain,
                     photo: photoUrl, // ক্লাউডিনারির Image URL
                     createdAt: new Date()
                 };
-                
+
 
                 const result = await slidersCollection.insertOne(sliderData);
                 res.status(201).send(result);
@@ -269,20 +269,55 @@ async function connectToMongoDB() {
         })
 
         // update any slider data 
+        app.put('/slider/:id', upload.single('photo'), async (req, res) => {
+            try {
+                const { id } = req.params;
+                const updatedData = req.body;
 
-        app.patch('/slider', async (req, res) => {
-            const { domain, id } = req.query;
-            const updatedData = req.body;
-            const query = { domain: domain, _id: new ObjectId(id) };
+                if (!id) {
+                    return res.status(400).send({ message: "ID is required" });
+                }
 
-            const update = {
-                $set: updatedData
+                const query = { _id: new ObjectId(id) };
+
+                const updateDoc = {
+                    $set: {
+                        headerTitle: updatedData.headerTitle,
+                        title: updatedData.title,
+                        description: updatedData.description,
+                        position: updatedData.position,
+                        domain: updatedData.domain,
+                    }
+                };
+
+                // 🟢 ২. নতুন ছবি আপলোড হলে Cloudinary-তে পাঠাবো
+                if (req.file) {
+                    // uploadToCloudinary অ্যারে (array) আশা করে, তাই [req.file] পাঠানো হয়েছে
+                    const uploadedUrls = await uploadToCloudinary([req.file]);
+
+                    if (uploadedUrls.length > 0) {
+                        // Cloudinary-র দেওয়া সিউকিওর (HTTPS) ইমেজ URL ডাটাবেজে সেভ হবে
+                        updateDoc.$set.photo = uploadedUrls[0];
+                    }
+                }
+
+                // ৩. ডাটাবেজে আপডেট
+                const result = await slidersCollection.updateOne(query, updateDoc);
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({ message: "Slider not found" });
+                }
+
+                // ৪. ডাটাবেজ থেকে আপডেট হওয়া সর্বশেষ ডাটা রেসপন্স পাঠানো
+                const updatedSlider = await slidersCollection.findOne(query);
+
+                res.status(200).send(updatedSlider);
+
+            } catch (error) {
+                console.error("Error updating slider:", error);
+                res.status(500).send({ message: "Failed to update slider", error: error.message });
             }
-            const options = {};
-            const result = await slidersCollection.updateOne(query, update, options);
-            res.send(result);
-
-        })
+        });
 
 
 
