@@ -100,8 +100,11 @@ async function connectToMongoDB() {
         // get all the agents data 
 
         app.get('/agents',async(req,res)=>{
-            const cursor = agentsCollection.find();
-            const result = await cursor.toArray();
+            const {hostname} = req.query;
+            const query = {targetDomain:hostname};
+
+            const result = await agentsCollection.find(query).toArray();
+           
             res.send(result);
         })
 
