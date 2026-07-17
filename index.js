@@ -39,10 +39,10 @@ async function connectToMongoDB() {
 
         app.get('/projects', async (req, res) => {
             try {
-                const { domain, id } = req.query;
+                const { agentId, id } = req.query;
 
-                if (domain && id) {
-                    const query = { domain: domain, _id: new ObjectId(id) };
+                if (agentId && id) {
+                    const query = { agentId: agentId, _id: new ObjectId(id) };
                     const result = await projectsCollection.findOne(query);
 
                     if (!result) {
@@ -52,8 +52,8 @@ async function connectToMongoDB() {
                 }
 
 
-                if (domain) {
-                    const query = { domain: domain };
+                if (agentId) {
+                    const query = { agentId: agentId };
                     const result = await projectsCollection.find(query).toArray();
                     return res.send(result);
                 }
