@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
 const app = express()
+const nodemailer = require('nodemailer');
 const port = process.env.PORT || 3000
 const { MongoClient, ObjectId } = require('mongodb');
 const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware, upload } = require('./utils/CloudinaryConfig');
@@ -9,6 +10,15 @@ const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware, up
 
 app.use(cors());
 app.use(express.json());
+
+// ১. নোডমেইলার ট্রান্সপোর্টার তৈরি (গুগল অ্যাপ পাসওয়ার্ড দিয়ে)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER, // আপনার জিমেইল আইডি
+        pass: process.env.EMAIL_PASS  // গুগল থেকে পাওয়া ১৬ অক্ষরের অ্যাপ পাসওয়ার্ড
+    }
+});
 
 
 const client = new MongoClient(process.env.MONGO_URI);
@@ -99,12 +109,12 @@ async function connectToMongoDB() {
 
         // get all the agents data 
 
-        app.get('/agents',async(req,res)=>{
-            const {hostname} = req.query;
-            const query = {targetDomain:hostname};
+        app.get('/agents', async (req, res) => {
+            const { hostname } = req.query;
+            const query = { targetDomain: hostname };
 
             const result = await agentsCollection.find(query).toArray();
-           
+
             res.send(result);
         })
 
@@ -117,7 +127,7 @@ async function connectToMongoDB() {
         app.post('/projects', uploadImagesMiddleware, async (req, res) => {
             try {
                 // ১. টেক্সট ডাটা আলাদা করা
-                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities, domain,agentId } = req.body;
+                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities, domain, agentId } = req.body;
 
                 // ২. আলাদা ফাইলে তৈরি করা ফাংশন দিয়ে ক্লাউডিনারিতে আপলোড ও URL আনা
                 const imageUrls = await uploadToCloudinary(req.files);
@@ -168,93 +178,158 @@ async function connectToMongoDB() {
 
         // add agent data 
 
-     app.post('/api/agents/register', upload.single('avatar'), async (req, res) => {
-    try {
-        // ১. টেক্সট ডাটা আলাদা করা
-        const {
-            agentId,
-            firstName,
-            lastName,
-            email,
-            authProvider,
-            agencyName,
-            whatsappNumber,
-            domainType,
-            targetDomain,
-            subdomain,
-            customDomain,
-            paymentStatus
-        } = req.body;
+        app.post('/api/agents/register', upload.single('avatar'), async (req, res) => {
+            try {
+                // ১. টেক্সট ডাটা আলাদা করা
+                const {
+                    agentId,
+                    firstName,
+                    lastName,
+                    email,
+                    authProvider,
+                    agencyName,
+                    whatsappNumber,
+                    domainType,
+                    targetDomain,
+                    subdomain,
+                    customDomain,
+                    paymentStatus
+                } = req.body;
 
-        // ২. ডুপ্লিকেট এজেন্ট বা ডোমেন চেক (Pure MongoDB ড্রাইভার দিয়ে)
-        const existingAgent = await agentsCollection.findOne({
-            $or: [
-                { agentId: agentId },
-                { email: email },
-                { targetDomain: targetDomain }
-            ]
+                // ২. ডুপ্লিকেট এজেন্ট বা ডোমেন চেক (Pure MongoDB ড্রাইভার দিয়ে)
+                const existingAgent = await agentsCollection.findOne({
+                    $or: [
+                        { agentId: agentId },
+                        { email: email },
+                        { targetDomain: targetDomain }
+                    ]
+                });
+
+                if (existingAgent) {
+                    return res.status(400).send({ error: true, message: "This Agent, Email, or Domain is already registered!" });
+                }
+
+                // ৩. আপনার আগের প্রজেক্টের মতোই ক্লাউডিনারিতে আপলোড ও URL আনা
+                let finalAvatarUrl = "";
+
+                if (req.file) {
+                    // আপনার প্রোজেক্টে যেমন 'uploadToCloudinary' তে req.files পাস করেছিলেন, 
+                    // এখানে যেহেতু সিঙ্গেল ফাইল (avatar), তাই সরাসরি req.file নিয়ে বাফার করে আপলোড করব:
+                    const b64 = Buffer.from(req.file.buffer).toString("base64");
+                    let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+
+                    const uploadResponse = await cloudinary.uploader.upload(dataURI, {
+                        folder: "agent_profiles",
+                    });
+                    finalAvatarUrl = uploadResponse.secure_url;
+                } else if (req.body.avatar) {
+                    // যদি গুগল সাইন-আপ হয়, তবে ফ্রন্টএন্ড থেকে গুগলের প্রোফাইল ইমেজের ডিরেক্ট URL আসবে
+                    finalAvatarUrl = req.body.avatar;
+                } else {
+                    // কোনো ইমেজ না থাকলে ডিফল্ট প্লেসহোল্ডার ইমেজ
+                    finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
+                }
+
+                // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
+                const finalAgentData = {
+                    agentId,
+                    firstName,
+                    lastName,
+                    email,
+                    avatar: finalAvatarUrl,
+                    authProvider,
+                    agencyName,
+                    whatsappNumber,
+                    domainType,
+                    targetDomain,
+                    subdomain: subdomain || null,
+                    customDomain: customDomain || null,
+                    paymentStatus: paymentStatus || 'pending',
+                    createdAt: new Date()
+                };
+
+                // ৫. ডাটাবেজে ইনসার্ট (insertOne)
+                const result = await agentsCollection.insertOne(finalAgentData);
+
+                // ৬. ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ সেভড অবজেক্ট পাঠানো
+                const savedAgent = {
+                    _id: result.insertedId,
+                    ...finalAgentData
+                };
+
+                res.status(201).send(savedAgent);
+
+            } catch (error) {
+                console.error("Error in agent registration API:", error);
+                res.status(500).send({ error: true, message: "Internal Server Error" });
+            }
         });
 
-        if (existingAgent) {
-            return res.status(400).send({ error: true, message: "This Agent, Email, or Domain is already registered!" });
-        }
 
-        // ৩. আপনার আগের প্রজেক্টের মতোই ক্লাউডিনারিতে আপলোড ও URL আনা
-        let finalAvatarUrl = "";
 
-        if (req.file) {
-            // আপনার প্রোজেক্টে যেমন 'uploadToCloudinary' তে req.files পাস করেছিলেন, 
-            // এখানে যেহেতু সিঙ্গেল ফাইল (avatar), তাই সরাসরি req.file নিয়ে বাফার করে আপলোড করব:
-            const b64 = Buffer.from(req.file.buffer).toString("base64");
-            let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-            
-            const uploadResponse = await cloudinary.uploader.upload(dataURI, {
-                folder: "agent_profiles", 
-            });
-            finalAvatarUrl = uploadResponse.secure_url;
-        } else if (req.body.avatar) {
-            // যদি গুগল সাইন-আপ হয়, তবে ফ্রন্টএন্ড থেকে গুগলের প্রোফাইল ইমেজের ডিরেক্ট URL আসবে
-            finalAvatarUrl = req.body.avatar;
-        } else {
-            // কোনো ইমেজ না থাকলে ডিফল্ট প্লেসহোল্ডার ইমেজ
-            finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
-        }
 
-        // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
-        const finalAgentData = {
-            agentId,
-            firstName,
-            lastName,
-            email,
-            avatar: finalAvatarUrl,
-            authProvider,
-            agencyName,
-            whatsappNumber,
-            domainType,
-            targetDomain,
-            subdomain: subdomain || null,
-            customDomain: customDomain || null,
-            paymentStatus: paymentStatus || 'pending',
-            createdAt: new Date()
-        };
 
-        // ৫. ডাটাবেজে ইনসার্ট (insertOne)
-        const result = await agentsCollection.insertOne(finalAgentData);
 
-        // ৬. ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ সেভড অবজেক্ট পাঠানো
-        const savedAgent = {
-            _id: result.insertedId,
-            ...finalAgentData
-        };
+        // ২. কন্টাক্ট এজেন্ট এপিআই এন্ডপয়েন্ট for email service
+        app.post('/api/contact-agent', async (req, res) => {
+            try {
+                const {
+                    userName, userEmail, userPhone, userMessage,
+                    agentEmail, agencyName,
+                    propertyTitle, propertyPrice, propertyLink
+                } = req.body;
 
-        res.status(201).send(savedAgent);
+                // ডাটা ভ্যালিডেশন
+                if (!userEmail || !agentEmail || !propertyTitle) {
+                    return res.status(400).send({ success: false, message: "Required fields are missing." });
+                }
 
-    } catch (error) {
-        console.error("Error in agent registration API:", error);
-        res.status(500).send({ error: true, message: "Internal Server Error" });
-    }
-});
+                // ৩. চিঠির খাম ও সুন্দর এইচটিএমএল (HTML) টেমপ্লেট
+                const mailOptions = {
+                    from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`, // মেইল পাঠাচ্ছে আপনার সিস্টেম
+                    to: agentEmail,      // 🎯 যে এজেন্টের প্রোপার্টি, সরাসরি তার পার্সোনাল জিমেইলে যাবে
+                    replyTo: userEmail,   // 🎯 এজেন্ট রিপ্লাই দিলে সরাসরি কাস্টমারের মেইলে চলে যাবে
+                    subject: `🔥 New Lead for "${propertyTitle}" - PrimeState`,
+                    html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <h2 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;">Hello ${agencyName},</h2>
+          <p style="font-size: 16px;">You have received a new customer inquiry for one of your listed properties on PrimeState.</p>
+          
+          <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <h3 style="color: #0f766e; margin-top: 0;">🏠 Property Details</h3>
+            <p style="margin: 5px 0;"><strong>Title:</strong> ${propertyTitle}</p>
+            <p style="margin: 5px 0;"><strong>Price:</strong> ${propertyPrice}</p>
+            <p style="margin: 15px 0 0 0;"><a href="${propertyLink}" target="_blank" style="background-color: #1e3a8a; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; font-size: 14px;">View Listed Property</a></p>
+          </div>
+          
+          <div style="background-color: #fff; padding: 15px; border: 1px solid #e2e8f0; border-radius: 6px; margin: 20px 0;">
+            <h3 style="color: #1e3a8a; margin-top: 0;">👤 Client Information</h3>
+            <p style="margin: 5px 0;"><strong>Name:</strong> ${userName}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
+            <p style="margin: 5px 0;"><strong>Phone:</strong> ${userPhone || 'Not provided'}</p>
+            <p style="margin: 10px 0 0 0;"><strong>Client Message:</strong></p>
+            <blockquote style="background: #f1f5f9; padding: 12px; border-left: 4px solid #1e3a8a; margin: 5px 0; font-style: italic;">
+              "${userMessage}"
+            </blockquote>
+          </div>
+          
+          <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+            This is an automated email from PrimeState System. Please hit "Reply" to contact the client directly.
+          </p>
+        </div>
+      `
+                };
 
+                // ৪. নোডমেইলার দিয়ে মেইল পাঠানো
+                await transporter.sendMail(mailOptions);
+
+                res.status(200).send({ success: true, message: "Email sent to agent successfully!" });
+
+            } catch (error) {
+                console.error("Nodemailer Error:", error);
+                res.status(500).send({ success: false, message: "Internal server error while sending email." });
+            }
+        });
 
 
 
@@ -308,7 +383,7 @@ async function connectToMongoDB() {
         // 🚀 POST: স্লাইডার ক্রিয়েট API (Cloudinary Integration সহ)
         app.post('/slider', upload.single('photo'), async (req, res) => {
             try {
-                const { headerTitle, title, description, position, domain,agentId } = req.body;
+                const { headerTitle, title, description, position, domain, agentId } = req.body;
                 let photoUrl = '';
 
                 // যদি ফ্রন্টএন্ড থেকে ফাইল আসে, ক্লাউডিনারিতে আপলোড হবে
