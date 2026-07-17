@@ -82,8 +82,8 @@ async function connectToMongoDB() {
         // get the slider data 
 
         app.get('/slider', async (req, res) => {
-            const { domain } = req.query;
-            const query = { domain: domain };
+            const { agentId } = req.query;
+            const query = { agentId: agentId };
             const result = await slidersCollection.find(query).toArray();
             res.send(result);
 
@@ -308,7 +308,7 @@ async function connectToMongoDB() {
         // 🚀 POST: স্লাইডার ক্রিয়েট API (Cloudinary Integration সহ)
         app.post('/slider', upload.single('photo'), async (req, res) => {
             try {
-                const { headerTitle, title, description, position, domain } = req.body;
+                const { headerTitle, title, description, position, domain,agentId } = req.body;
                 let photoUrl = '';
 
                 // যদি ফ্রন্টএন্ড থেকে ফাইল আসে, ক্লাউডিনারিতে আপলোড হবে
@@ -326,6 +326,7 @@ async function connectToMongoDB() {
                     description,
                     position,
                     domain: req.body.domain,
+                    agentId,
                     photo: photoUrl, // ক্লাউডিনারির Image URL
                     createdAt: new Date()
                 };
