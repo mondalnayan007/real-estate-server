@@ -123,57 +123,121 @@ async function connectToMongoDB() {
 
 
 
-        //   add projects 
-        app.post('/projects', uploadImagesMiddleware, async (req, res) => {
+// add projects (Updated for PropertyManagement.jsx)
+app.post('/projects', uploadImagesMiddleware, async (req, res) => {
+    try {
+        // ১. টেক্সট ডাটা ও নতুন ফিল্ডসমূহ রিসিভ করা
+        const { 
+            title, 
+            price, 
+            location, 
+            category, 
+            tag, 
+            status, 
+            description, 
+            brochureLink,
+            totalShares,
+            sharePrice,
+            buildingType,
+            frontRoad,
+            unitPerFloor,
+            passengerLift,
+            cargoLift,
+            electricityBackup,
+            rooftopGardening,
+            carParking,
+            conventionHall,
+            domain, 
+            agentId,
+            amenities,
+            availableUnits,
+            availableShares
+        } = req.body;
+
+        // ২. ক্লাউডিনারিতে ফাইল আপলোড ও URL আনা (ফাইল না থাকলে ক্র্যাশ প্রতিরোধ সহ)
+        let imageUrls = [];
+        if (req.files && req.files.length > 0) {
+            imageUrls = await uploadToCloudinary(req.files);
+        }
+
+        // ৩. JSON ডাটা সেফলি পার্স করা (amenities ও availableUnits)
+        let parsedAmenities = [];
+        if (amenities) {
             try {
-                // ১. টেক্সট ডাটা আলাদা করা
-                const { title, price, location, category, tag, beds, baths, sqft, status, description, videoLink, amenities, domain, agentId } = req.body;
-
-                // ২. আলাদা ফাইলে তৈরি করা ফাংশন দিয়ে ক্লাউডিনারিতে আপলোড ও URL আনা
-                const imageUrls = await uploadToCloudinary(req.files);
-
-                // ৩. Amenities পার্স করা
-                let parsedAmenities = amenities ? JSON.parse(amenities) : [];
-
-                // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
-                const finalProjectData = {
-                    title,
-                    price,
-                    location,
-                    category,
-                    tag,
-                    beds: Number(beds) || 0,
-                    baths: Number(baths) || 0,
-                    sqft,
-                    status,
-                    description,
-                    videoLink,
-                    amenities: parsedAmenities,
-                    // প্রথম ইমেজটি মেইন 'img' ফিল্ডে যাবে
-                    img: imageUrls.length > 0 ? imageUrls[0] : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
-                    allImages: imageUrls,
-                    domain: req.body.domain,
-                    agentId
-                };
-
-                // console.log(finalProjectData.domain);
-
-                // ৫. ডাটাবেজে ইনসার্ট
-                const result = await projectsCollection.insertOne(finalProjectData);
-
-                // ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ অবজেক্ট পাঠানো
-                const savedProject = {
-                    _id: result.insertedId,
-                    ...finalProjectData
-                };
-
-                res.status(201).send(savedProject);
-
-            } catch (error) {
-                console.error("Error in /projects route:", error);
-                res.status(500).send({ error: true, message: "Internal Server Error" });
+                parsedAmenities = typeof amenities === 'string' ? JSON.parse(amenities) : amenities;
+            } catch (err) {
+                console.warn("Amenities JSON parse error:", err.message);
             }
-        });
+        }
+
+        let parsedUnits = [];
+        if (availableUnits) {
+            try {
+                parsedUnits = typeof availableUnits === 'string' ? JSON.parse(availableUnits) : availableUnits;
+            } catch (err) {
+                console.warn("AvailableUnits JSON parse error:", err.message);
+            }
+        }
+
+        // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
+        const finalProjectData = {
+            title: title || "",
+            price: price || "",
+            location: location || "",
+            category: category || "Apartments",
+            tag: tag || "",
+            status: status || "completed",
+            description: description || "",
+            brochureLink: brochureLink || "",
+            domain: domain || "",
+            agentId: agentId || "",
+
+            // Share Structure
+            totalShares: Number(totalShares) || 0,
+            sharePrice: Number(sharePrice) || 0,
+            availableShares: Number(availableShares ?? totalShares) || 0,
+
+            // Building Specifications
+            buildingType: buildingType || "Residential",
+            frontRoad: frontRoad || "",
+            unitPerFloor: Number(unitPerFloor) || 0,
+            passengerLift: Number(passengerLift) || 0,
+            cargoLift: Number(cargoLift) || 0,
+
+            // Features (FormData-র স্ট্রিং 'true'/'false' কে বুলিয়ানে কাস্ট করা)
+            electricityBackup: electricityBackup === 'true' || electricityBackup === true,
+            rooftopGardening: rooftopGardening === 'true' || rooftopGardening === true,
+            carParking: carParking === 'true' || carParking === true,
+            conventionHall: conventionHall === 'true' || conventionHall === true,
+
+            // Dynamic Data
+            amenities: parsedAmenities,
+            availableUnits: parsedUnits,
+
+            // ইমেজ হ্যান্ডলিং (পূর্বের মতো)
+            img: imageUrls.length > 0 ? imageUrls[0] : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
+            allImages: imageUrls,
+            images: imageUrls, // UI টেবিলের p.images এর সুবিধার্থে
+
+            createdAt: new Date()
+        };
+
+        // ৫. ডাটাবেজে ইনসার্ট
+        const result = await projectsCollection.insertOne(finalProjectData);
+
+        // ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ অবজেক্ট পাঠানো
+        const savedProject = {
+            _id: result.insertedId,
+            ...finalProjectData
+        };
+
+        res.status(201).send(savedProject);
+
+    } catch (error) {
+        console.error("Error in /projects route:", error);
+        res.status(500).send({ error: true, message: "Internal Server Error" });
+    }
+});
 
 
         // add agent data 
