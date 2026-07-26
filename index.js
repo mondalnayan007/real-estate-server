@@ -138,6 +138,7 @@ app.post('/projects', uploadImagesMiddleware, async (req, res) => {
             brochureLink,
             totalShares,
             sharePrice,
+            bookingPrice,
             buildingType,
             frontRoad,
             unitPerFloor,
@@ -194,6 +195,7 @@ app.post('/projects', uploadImagesMiddleware, async (req, res) => {
 
             // Share Structure
             totalShares: Number(totalShares) || 0,
+            bookingPrice: Number(bookingPrice) || 0,
             sharePrice: Number(sharePrice) || 0,
             availableShares: Number(availableShares ?? totalShares) || 0,
 
