@@ -2,6 +2,7 @@ require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken'); 
 const app = express()
 const nodemailer = require('nodemailer');
 const port = process.env.PORT || 3000
@@ -414,6 +415,81 @@ async function connectToMongoDB() {
             } catch (error) {
                 console.error("Booking API Error:", error);
                 res.status(500).json({ success: false, message: "Internal server error during booking." });
+            }
+        });
+
+
+        // ------------------------------------------------------------------
+        // 🔑 Login API: POST /api/login
+        // ------------------------------------------------------------------
+        app.post('/api/login', async (req, res) => {
+            try {
+                const { email, password } = req.body;
+
+                // ১. ইনপুট ভ্যালিডেশন
+                if (!email || !password) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Email and password are required!'
+                    });
+                }
+
+                // ২. Native MongoDB কালেকশন থেকে ইমেইল অনুযায়ী ইউজার খোঁজা
+                const user = await usersCollection.findOne({ email: email });
+                if (!user) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid email or password!'
+                    });
+                }
+
+                // ৩. পাসওয়ার্ড ভ্যালিডেশন 
+                // (যদি রেজিস্ট্রেশনের সময় bcrypt দিয়ে হ্যাশ করে থাকেন)
+                const isPasswordValid = await bcrypt.compare(password, user.password);
+
+                // ⚠️ নোট: আপনি যদি ডাটাবেজে প্লেন টেক্সট (Plain Text) পাসওয়ার্ড সেভ করে থাকেন, 
+                // তবে উপরের চেনের বদলে নিচের কমেন্ট করা লাইনটি ব্যবহার করতে পারেন:
+                // const isPasswordValid = (user.password === password);
+
+                if (!isPasswordValid) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid email or password!'
+                    });
+                }
+
+                // ৪. JWT টোকেন তৈরি করা
+                const token = jwt.sign(
+                    {
+                        id: user._id,
+                        email: user.email,
+                        role: 'client'
+                    },
+                    process.env.JWT_SECRET || 'secret_key_123',
+                    { expiresIn: '7d' }
+                );
+
+                // ৫. পাসওয়ার্ড বাদ দিয়ে ইউজার ডাটা প্রস্তুত করা
+                const userData = {
+                    _id: user._id,
+                    name: user.name || user.fullName || 'User',
+                    email: user.email,
+                    role: 'client'
+                };
+
+                return res.status(200).json({
+                    success: true,
+                    message: 'Login successful!',
+                    token,
+                    user: userData
+                });
+
+            } catch (error) {
+                console.error('Login API Error:', error);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Server error during login. Please try again.'
+                });
             }
         });
 
