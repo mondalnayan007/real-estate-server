@@ -1,6 +1,7 @@
 require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
 const app = express()
 const nodemailer = require('nodemailer');
 const port = process.env.PORT || 3000
@@ -31,6 +32,8 @@ async function connectToMongoDB() {
         const settingsCollection = db.collection('settings');
         const slidersCollection = db.collection('sliders');
         const agentsCollection = db.collection('agents');
+        const usersCollection = db.collection('users');
+        const bookingsCollection = db.collection('bookings');
 
 
 
@@ -123,123 +126,123 @@ async function connectToMongoDB() {
 
 
 
-// add projects (Updated for PropertyManagement.jsx)
-app.post('/projects', uploadImagesMiddleware, async (req, res) => {
-    try {
-        // ১. টেক্সট ডাটা ও নতুন ফিল্ডসমূহ রিসিভ করা
-        const { 
-            title, 
-            price, 
-            location, 
-            category, 
-            tag, 
-            status, 
-            description, 
-            brochureLink,
-            totalShares,
-            sharePrice,
-            bookingPrice,
-            buildingType,
-            frontRoad,
-            unitPerFloor,
-            passengerLift,
-            cargoLift,
-            electricityBackup,
-            rooftopGardening,
-            carParking,
-            conventionHall,
-            domain, 
-            agentId,
-            amenities,
-            availableUnits,
-            availableShares
-        } = req.body;
-
-        // ২. ক্লাউডিনারিতে ফাইল আপলোড ও URL আনা (ফাইল না থাকলে ক্র্যাশ প্রতিরোধ সহ)
-        let imageUrls = [];
-        if (req.files && req.files.length > 0) {
-            imageUrls = await uploadToCloudinary(req.files);
-        }
-
-        // ৩. JSON ডাটা সেফলি পার্স করা (amenities ও availableUnits)
-        let parsedAmenities = [];
-        if (amenities) {
+        // add projects (Updated for PropertyManagement.jsx)
+        app.post('/projects', uploadImagesMiddleware, async (req, res) => {
             try {
-                parsedAmenities = typeof amenities === 'string' ? JSON.parse(amenities) : amenities;
-            } catch (err) {
-                console.warn("Amenities JSON parse error:", err.message);
+                // ১. টেক্সট ডাটা ও নতুন ফিল্ডসমূহ রিসিভ করা
+                const {
+                    title,
+                    price,
+                    location,
+                    category,
+                    tag,
+                    status,
+                    description,
+                    brochureLink,
+                    totalShares,
+                    sharePrice,
+                    bookingPrice,
+                    buildingType,
+                    frontRoad,
+                    unitPerFloor,
+                    passengerLift,
+                    cargoLift,
+                    electricityBackup,
+                    rooftopGardening,
+                    carParking,
+                    conventionHall,
+                    domain,
+                    agentId,
+                    amenities,
+                    availableUnits,
+                    availableShares
+                } = req.body;
+
+                // ২. ক্লাউডিনারিতে ফাইল আপলোড ও URL আনা (ফাইল না থাকলে ক্র্যাশ প্রতিরোধ সহ)
+                let imageUrls = [];
+                if (req.files && req.files.length > 0) {
+                    imageUrls = await uploadToCloudinary(req.files);
+                }
+
+                // ৩. JSON ডাটা সেফলি পার্স করা (amenities ও availableUnits)
+                let parsedAmenities = [];
+                if (amenities) {
+                    try {
+                        parsedAmenities = typeof amenities === 'string' ? JSON.parse(amenities) : amenities;
+                    } catch (err) {
+                        console.warn("Amenities JSON parse error:", err.message);
+                    }
+                }
+
+                let parsedUnits = [];
+                if (availableUnits) {
+                    try {
+                        parsedUnits = typeof availableUnits === 'string' ? JSON.parse(availableUnits) : availableUnits;
+                    } catch (err) {
+                        console.warn("AvailableUnits JSON parse error:", err.message);
+                    }
+                }
+
+                // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
+                const finalProjectData = {
+                    title: title || "",
+                    price: price || "",
+                    location: location || "",
+                    category: category || "Apartments",
+                    tag: tag || "",
+                    status: status || "completed",
+                    description: description || "",
+                    brochureLink: brochureLink || "",
+                    domain: domain || "",
+                    agentId: agentId || "",
+
+                    // Share Structure
+                    totalShares: Number(totalShares) || 0,
+                    bookingPrice: Number(bookingPrice) || 0,
+                    sharePrice: Number(sharePrice) || 0,
+                    availableShares: Number(availableShares ?? totalShares) || 0,
+
+                    // Building Specifications
+                    buildingType: buildingType || "Residential",
+                    frontRoad: frontRoad || "",
+                    unitPerFloor: Number(unitPerFloor) || 0,
+                    passengerLift: Number(passengerLift) || 0,
+                    cargoLift: Number(cargoLift) || 0,
+
+                    // Features (FormData-র স্ট্রিং 'true'/'false' কে বুলিয়ানে কাস্ট করা)
+                    electricityBackup: electricityBackup === 'true' || electricityBackup === true,
+                    rooftopGardening: rooftopGardening === 'true' || rooftopGardening === true,
+                    carParking: carParking === 'true' || carParking === true,
+                    conventionHall: conventionHall === 'true' || conventionHall === true,
+
+                    // Dynamic Data
+                    amenities: parsedAmenities,
+                    availableUnits: parsedUnits,
+
+                    // ইমেজ হ্যান্ডলিং (পূর্বের মতো)
+                    img: imageUrls.length > 0 ? imageUrls[0] : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
+                    allImages: imageUrls,
+                    images: imageUrls, // UI টেবিলের p.images এর সুবিধার্থে
+
+                    createdAt: new Date()
+                };
+
+                // ৫. ডাটাবেজে ইনসার্ট
+                const result = await projectsCollection.insertOne(finalProjectData);
+
+                // ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ অবজেক্ট পাঠানো
+                const savedProject = {
+                    _id: result.insertedId,
+                    ...finalProjectData
+                };
+
+                res.status(201).send(savedProject);
+
+            } catch (error) {
+                console.error("Error in /projects route:", error);
+                res.status(500).send({ error: true, message: "Internal Server Error" });
             }
-        }
-
-        let parsedUnits = [];
-        if (availableUnits) {
-            try {
-                parsedUnits = typeof availableUnits === 'string' ? JSON.parse(availableUnits) : availableUnits;
-            } catch (err) {
-                console.warn("AvailableUnits JSON parse error:", err.message);
-            }
-        }
-
-        // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
-        const finalProjectData = {
-            title: title || "",
-            price: price || "",
-            location: location || "",
-            category: category || "Apartments",
-            tag: tag || "",
-            status: status || "completed",
-            description: description || "",
-            brochureLink: brochureLink || "",
-            domain: domain || "",
-            agentId: agentId || "",
-
-            // Share Structure
-            totalShares: Number(totalShares) || 0,
-            bookingPrice: Number(bookingPrice) || 0,
-            sharePrice: Number(sharePrice) || 0,
-            availableShares: Number(availableShares ?? totalShares) || 0,
-
-            // Building Specifications
-            buildingType: buildingType || "Residential",
-            frontRoad: frontRoad || "",
-            unitPerFloor: Number(unitPerFloor) || 0,
-            passengerLift: Number(passengerLift) || 0,
-            cargoLift: Number(cargoLift) || 0,
-
-            // Features (FormData-র স্ট্রিং 'true'/'false' কে বুলিয়ানে কাস্ট করা)
-            electricityBackup: electricityBackup === 'true' || electricityBackup === true,
-            rooftopGardening: rooftopGardening === 'true' || rooftopGardening === true,
-            carParking: carParking === 'true' || carParking === true,
-            conventionHall: conventionHall === 'true' || conventionHall === true,
-
-            // Dynamic Data
-            amenities: parsedAmenities,
-            availableUnits: parsedUnits,
-
-            // ইমেজ হ্যান্ডলিং (পূর্বের মতো)
-            img: imageUrls.length > 0 ? imageUrls[0] : "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80",
-            allImages: imageUrls,
-            images: imageUrls, // UI টেবিলের p.images এর সুবিধার্থে
-
-            createdAt: new Date()
-        };
-
-        // ৫. ডাটাবেজে ইনসার্ট
-        const result = await projectsCollection.insertOne(finalProjectData);
-
-        // ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ অবজেক্ট পাঠানো
-        const savedProject = {
-            _id: result.insertedId,
-            ...finalProjectData
-        };
-
-        res.status(201).send(savedProject);
-
-    } catch (error) {
-        console.error("Error in /projects route:", error);
-        res.status(500).send({ error: true, message: "Internal Server Error" });
-    }
-});
+        });
 
 
         // add agent data 
@@ -328,6 +331,89 @@ app.post('/projects', uploadImagesMiddleware, async (req, res) => {
             } catch (error) {
                 console.error("Error in agent registration API:", error);
                 res.status(500).send({ error: true, message: "Internal Server Error" });
+            }
+        });
+
+
+
+        // 🚀 POST: /api/bookings
+        app.post('/api/bookings', async (req, res) => {
+            try {
+                const bookingData = req.body;
+                const { email, applicantName, contactNo } = bookingData;
+
+                if (!email) {
+                    return res.status(400).json({ success: false, message: "Email is required!" });
+                }
+
+
+                // ১. চেক করা ইউজার আগে থেকে আছে কি না
+                let user = await usersCollection.findOne({ email: email.toLowerCase() });
+                let autoGeneratedPassword = null;
+
+                if (!user) {
+                    // ইউজার না থাকলে নতুন পাসওয়ার্ড জেনারেট করা (যেমন: pass_8a3f9)
+                    autoGeneratedPassword = 'pass_' + Math.random().toString(36).slice(-5);
+                    const hashedPassword = await bcrypt.hash(autoGeneratedPassword, 10);
+
+                    const newUser = {
+                        name: applicantName,
+                        email: email.toLowerCase(),
+                        phone: contactNo,
+                        password: hashedPassword,
+                        role: 'client',
+                        createdAt: new Date()
+                    };
+
+                    // 💥 'users' কালেকশনে অটো ক্রিয়েট ও ইনসার্ট
+                    const userResult = await usersCollection.insertOne(newUser);
+                    user = { _id: userResult.insertedId, ...newUser };
+
+                    // 📧 নতুন ইউজারকে পাসওয়ার্ড ইমেইল করে দেওয়া
+                    try {
+                        await transporter.sendMail({
+                            from: '"Property Management" <noreply@yourdomain.com>',
+                            to: email,
+                            subject: 'Your Account Credentials for Property Portal',
+                            html: `
+            <h3>Dear ${applicantName},</h3>
+            <p>Thank you for submitting your property booking application.</p>
+            <p>An account has been automatically created for you to track your booking status.</p>
+            <br/>
+            <p><strong>Your Account Login Credentials:</strong></p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Password:</strong> <code style="background:#f4f4f4; padding:4px 8px; font-weight:bold;">${autoGeneratedPassword}</code></p>
+            <br/>
+            <p>Please log in to your dashboard to view your booking details and updates.</p>
+          `
+                        });
+                    } catch (mailError) {
+                        console.error("Failed to send email:", mailError);
+                        // ইমেইল ফেল করলেও বুকিং আটকে থাকবে না
+                    }
+                }
+
+                // ২. বুকিং অবজেক্টের সাথে userId লিঙ্ক করা
+                const newBookingDocument = {
+                    ...bookingData,
+                    userId: user._id, // লিঙ্ক করা হলো ইউজার আইডির সাথে
+                    status: 'pending', // প্রারম্ভিক স্ট্যাটাস
+                    createdAt: new Date()
+                };
+
+                // 💥 'bookings' কালেকশনে ইনসার্ট
+                const bookingResult = await bookingsCollection.insertOne(newBookingDocument);
+
+                res.status(201).json({
+                    success: true,
+                    message: "Booking application submitted successfully!",
+                    bookingId: bookingResult.insertedId,
+                    accountCreated: !!autoGeneratedPassword
+                });
+
+            } catch (error) {
+                console.error("Booking API Error:", error);
+                res.status(500).json({ success: false, message: "Internal server error during booking." });
             }
         });
 
