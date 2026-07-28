@@ -2,7 +2,7 @@ require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken'); 
+const jwt = require('jsonwebtoken');
 const app = express()
 const nodemailer = require('nodemailer');
 const port = process.env.PORT || 3000
@@ -121,6 +121,102 @@ async function connectToMongoDB() {
 
             res.send(result);
         })
+
+
+
+
+        app.get('/api/my-bookings', async (req, res) => {
+            try {
+                const { userId } = req.query;
+
+                // ১. userId না থাকলে বা ইনভ্যালিড ObjectId হলে হ্যান্ডেল করা
+                if (!userId || !ObjectId.isValid(userId)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Valid User ID is required'
+                    });
+                }
+
+                // ২. নির্দিষ্ট ইউজারের বুকিং ডাটা ফেচ করা
+                const userBookings = await bookingsCollection
+                    .find({ userId: new ObjectId(userId) })
+                    .toArray();
+
+                    
+                if (userBookings.length === 0) {
+                    return res.json({ success: true, bookings: [] });
+                }
+
+
+                // ৩. বুকিং ডাটা থেকে সব projectId এক্সট্র্যাক্ট করা (ইনভ্যালিড আইডি এড়ানোর জন্য সেফটি ফিল্টার সহ)
+                const projectIds = userBookings
+                    .filter(b => b.projectId && ObjectId.isValid(b.projectId))
+                    .map(b => new ObjectId(b.projectId));
+
+                // ৪. projectsCollection থেকে সংশ্লিষ্ট সব প্রজেক্ট ডাটা একবারে আনা
+                const projects = await projectsCollection
+                    .find({ _id: { $in: projectIds } })
+                    .toArray();
+
+                // ৫. প্রতিটি বুকিং অবজেক্টের ভেতর `projectDetails` ফিল্ডে ওই প্রজেক্টের ডাটা বসিয়ে দেওয়া
+                const fullBookingsData = userBookings.map(booking => {
+                    const project = projects.find(
+                        p => p._id.toString() === booking.projectId?.toString()
+                    );
+
+                    return {
+                        ...booking,
+                        projectDetails: project || null // প্রজেক্ট পাওয়া না গেলে null বসবে
+                    };
+                });
+
+                // ৬. প্রজেক্টের ডাটা সহ সম্পূর্ণ বুকিং অ্যারে ফ্রন্টএন্ডে রেসপন্স পাঠানো
+                res.json({ success: true, bookings: fullBookingsData });
+
+            } catch (error) {
+                console.error('Error fetching bookings:', error);
+                res.status(500).json({ success: false, message: error.message });
+            }
+        });
+
+        // ২. ইউজার নতুন পেমেন্ট দিলে 'bookingsCollection'-এ Push করার API
+        app.post('/api/submit-payment', async (req, res) => {
+            try {
+                const { bookingId, paymentMethod, bankName, transactionId, amount } = req.body;
+
+                if (!bookingId || !transactionId || !amount) {
+                    return res.status(400).json({ success: false, message: 'All required fields must be provided' });
+                }
+
+                const newTransaction = {
+                    _id: new ObjectId(),
+                    paymentMethod, // 'cash' or 'bank'
+                    bankName: paymentMethod === 'bank' ? bankName : 'N/A',
+                    transactionId,
+                    amount: Number(amount),
+                    status: 'pending', // অ্যাডমিন পরবর্তীতে এটি 'approved' করবে
+                    createdAt: new Date()
+                };
+
+                // bookingsCollection-এ নির্দিষ্ট বুকিং ডকুমেন্টের 'transactions' অ্যারেতে Push করা
+                const result = await bookingsCollection.updateOne(
+                    { _id: new ObjectId(bookingId) },
+                    { $push: { transactions: newTransaction } }
+                );
+
+                if (result.modifiedCount > 0) {
+                    res.json({ success: true, message: 'Payment submitted for Admin approval!' });
+                } else {
+                    res.status(400).json({ success: false, message: 'Booking not found' });
+                }
+
+            } catch (error) {
+                console.error('Error submitting payment:', error);
+                res.status(500).json({ success: false, message: error.message });
+            }
+        });
+
+
 
 
         // post apis here 
@@ -341,7 +437,8 @@ async function connectToMongoDB() {
         app.post('/api/bookings', async (req, res) => {
             try {
                 const bookingData = req.body;
-                const { email, applicantName, contactNo } = bookingData;
+                const { email, applicantName, contactNo, projectId } = bookingData;
+
 
                 if (!email) {
                     return res.status(400).json({ success: false, message: "Email is required!" });
