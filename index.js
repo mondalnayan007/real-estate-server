@@ -219,6 +219,14 @@ async function connectToMongoDB() {
         // });
 
 
+        app.get('/admin/transactions',async(req,res)=>{
+            const {bookingId} = req.query;
+            const query= {bookingId: new ObjectId(bookingId)};
+            const result = await transactionsCollection.find(query).toArray();
+            res.send(result);
+        })
+
+
 
         
         // ==========================================
