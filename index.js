@@ -35,6 +35,8 @@ async function connectToMongoDB() {
         const agentsCollection = db.collection('agents');
         const usersCollection = db.collection('users');
         const bookingsCollection = db.collection('bookings');
+        const transactionsCollection = db.collection('transactions');
+                
 
 
 
@@ -142,7 +144,7 @@ async function connectToMongoDB() {
                     .find({ userId: new ObjectId(userId) })
                     .toArray();
 
-                    
+
                 if (userBookings.length === 0) {
                     return res.json({ success: true, bookings: [] });
                 }
@@ -212,6 +214,67 @@ async function connectToMongoDB() {
 
             } catch (error) {
                 console.error('Error submitting payment:', error);
+                res.status(500).json({ success: false, message: error.message });
+            }
+        });
+
+
+
+        
+        // ==========================================
+        // ২. এডমিন প্যানেল: পেন্ডিং রিকোয়েস্টগুলোর লিস্ট পাওয়ার API
+        // ==========================================
+        app.get('/api/admin/pending-payments', async (req, res) => {
+            try {
+                const transactionsCollection = req.db.collection('transactions');
+
+                // Aggregate দিয়ে User এবং Booking-এর সাথে JOIN করা (Populate-এর মতো)
+                const pendingTxns = await transactionsCollection.aggregate([
+                    { $match: { status: 'pending' } },
+                    { $sort: { createdAt: -1 } },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'userId',
+                            foreignField: '_id',
+                            as: 'user'
+                        }
+                    },
+                    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'bookings',
+                            localField: 'bookingId',
+                            foreignField: '_id',
+                            as: 'booking'
+                        }
+                    },
+                    { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+                    {
+                        $project: {
+                            amount: 1,
+                            paymentMethod: 1,
+                            bankName: 1,
+                            transactionId: 1,
+                            status: 1,
+                            createdAt: 1,
+                            'user.name': 1,
+                            'user.email': 1,
+                            'user.phone': 1,
+                            'booking.projectName': 1,
+                            'booking.totalAmount': 1,
+                            'booking.totalPaid': 1
+                        }
+                    }
+                ]).toArray();
+
+                res.status(200).json({
+                    success: true,
+                    count: pendingTxns.length,
+                    data: pendingTxns
+                });
+
+            } catch (error) {
                 res.status(500).json({ success: false, message: error.message });
             }
         });
@@ -512,6 +575,115 @@ async function connectToMongoDB() {
             } catch (error) {
                 console.error("Booking API Error:", error);
                 res.status(500).json({ success: false, message: "Internal server error during booking." });
+            }
+        });
+
+
+
+
+        
+
+        // ==========================================
+        // ১. ইউজার যখন পেমেন্ট সাবমিট করবে
+        // ==========================================
+        app.post('/api/submit-payment', async (req, res) => {
+            try {
+                const { bookingId, userId, amount, paymentMethod, bankName, transactionId } = req.body;
+                console.log(bookingId);
+
+                if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
+                    return res.status(400).json({ success: false, message: 'All required fields are needed.' });
+                }
+
+                
+
+                // Transaction ID ইউনিক কি না চেক করা
+                const existingTxn = await transactionsCollection.findOne({ transactionId });
+                if (existingTxn) {
+                    return res.status(400).json({ success: false, message: 'Transaction ID already exists!' });
+                }
+
+                // নতুন ট্রানজ্যাকশন ডাটা
+                const newTransaction = {
+                    bookingId: new ObjectId(bookingId),
+                    userId: new ObjectId(userId),
+                    amount: Number(amount),
+                    paymentMethod,
+                    bankName: bankName || 'N/A',
+                    transactionId,
+                    status: 'pending', // প্রাথমিক অবস্থা পেন্ডিং
+                    createdAt: new Date()
+                };
+
+                const txnResult = await transactionsCollection.insertOne(newTransaction);
+
+                // প্রজেক্টের (Bookings) transactions অ্যারেতে আইডিটা পুশ করে দেওয়া
+                await bookingsCollection.updateOne(
+                    { _id: new ObjectId(bookingId) },
+                    { $push: { transactions: txnResult.insertedId } }
+                );
+
+                res.status(201).json({
+                    success: true,
+                    message: 'Payment request submitted successfully. Pending verification.',
+                    data: { _id: txnResult.insertedId, ...newTransaction }
+                });
+
+            } catch (error) {
+                res.status(500).json({ success: false, message: error.message });
+            }
+        });
+
+
+
+
+        // ==========================================
+        // ৩. এডমিন প্যানেল: Approve / Reject করার API
+        // ==========================================
+        app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
+            try {
+                const { txnId } = req.params;
+                const { status } = req.body; // 'approved' অথবা 'rejected'
+
+                if (!['approved', 'rejected'].includes(status)) {
+                    return res.status(400).json({ success: false, message: 'Invalid status value.' });
+                }
+
+                const transactionsCollection = req.db.collection('transactions');
+                const bookingsCollection = req.db.collection('bookings');
+
+                // Transaction টি খুঁজে বের করা
+                const transaction = await transactionsCollection.findOne({ _id: new ObjectId(txnId) });
+
+                if (!transaction) {
+                    return res.status(404).json({ success: false, message: 'Transaction not found.' });
+                }
+
+                if (transaction.status === 'approved') {
+                    return res.status(400).json({ success: false, message: 'Transaction is already approved.' });
+                }
+
+                // ১. Transaction এর স্ট্যাটাস আপডেট করা
+                await transactionsCollection.updateOne(
+                    { _id: new ObjectId(txnId) },
+                    { $set: { status: status, updatedAt: new Date() } }
+                );
+
+                // ২. এডমিন যদি APPROVE করে, তবে সাথে সাথে Booking-এর totalPaid অটোমেটিক বেড়ে যাবে
+                if (status === 'approved') {
+                    await bookingsCollection.updateOne(
+                        { _id: new ObjectId(transaction.bookingId) },
+                        { $inc: { totalPaid: Number(transaction.amount) } } // $inc অটো টাকা যোগ করবে
+                    );
+                }
+
+                res.status(200).json({
+                    success: true,
+                    message: `Transaction ${status} successfully!`
+                });
+
+            } catch (error) {
+                res.status(500).json({ success: false, message: error.message });
             }
         });
 
