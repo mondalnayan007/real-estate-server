@@ -36,7 +36,7 @@ async function connectToMongoDB() {
         const usersCollection = db.collection('users');
         const bookingsCollection = db.collection('bookings');
         const transactionsCollection = db.collection('transactions');
-                
+
 
 
 
@@ -219,27 +219,25 @@ async function connectToMongoDB() {
         // });
 
 
-        app.get('/admin/transactions',async(req,res)=>{
-            const {bookingId} = req.query;
-            const query= {bookingId: new ObjectId(bookingId)};
+        app.get('/admin/transactions', async (req, res) => {
+            const { bookingId } = req.query;
+            const query = { bookingId: new ObjectId(bookingId) };
             const result = await transactionsCollection.find(query).toArray();
             res.send(result);
         })
 
 
 
-        
+
         // ==========================================
-        // ২. এডমিন প্যানেল: পেন্ডিং রিকোয়েস্টগুলোর লিস্ট পাওয়ার API
+        // ২. এডমিন প্যানেল: অল ট্রানজ্যাকশন লিস্ট পাওয়ার API (Pending, Approved & Rejected)
         // ==========================================
         app.get('/api/admin/pending-payments', async (req, res) => {
             try {
-                
-
-                // Aggregate দিয়ে User এবং Booking-এর সাথে JOIN করা (Populate-এর মতো)
-                const pendingTxns = await transactionsCollection.aggregate([
-                    { $match: { status: 'pending' } },
-                    { $sort: { createdAt: -1 } },
+                // Aggregate দিয়ে User এবং Booking-এর সাথে JOIN করা
+                // 🔥 $match থেকে status: 'pending' সরিয়ে দেওয়া হলো যাতে সব ডাটা রিটার্ন করে
+                const allTxns = await transactionsCollection.aggregate([
+                    { $sort: { createdAt: -1 } }, // নতুন ট্রানজ্যাকশন সবার উপরে থাকবে
                     {
                         $lookup: {
                             from: 'users',
@@ -264,7 +262,7 @@ async function connectToMongoDB() {
                             paymentMethod: 1,
                             bankName: 1,
                             transactionId: 1,
-                            status: 1,
+                            status: 1, // status: 'approved', 'rejected', or 'pending'
                             createdAt: 1,
                             'user.name': 1,
                             'user.email': 1,
@@ -278,16 +276,15 @@ async function connectToMongoDB() {
 
                 res.status(200).json({
                     success: true,
-                    count: pendingTxns.length,
-                    data: pendingTxns
+                    count: allTxns.length,
+                    data: allTxns
                 });
 
             } catch (error) {
+                console.error("Error fetching transactions:", error);
                 res.status(500).json({ success: false, message: error.message });
             }
         });
-
-
 
 
         // post apis here 
@@ -589,61 +586,61 @@ async function connectToMongoDB() {
 
 
 
-        
-app.post('/api/submit-payment', async (req, res) => {
-    try {
-        const { bookingId, userId, amount, paymentMethod, bankName, transactionId } = req.body;
 
-        // ১. প্রয়োজনীয় ফিল্ড চেক
-        if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
-            return res.status(400).json({ success: false, message: 'All required fields are needed.' });
-        }
+        app.post('/api/submit-payment', async (req, res) => {
+            try {
+                const { bookingId, userId, amount, paymentMethod, bankName, transactionId } = req.body;
 
-        // ২. ID গুলো ভ্যালিড MongoDB ObjectId কি না চেক
-        if (!ObjectId.isValid(bookingId) || !ObjectId.isValid(userId)) {
-            console.log("Invalid ObjectId passed:", { bookingId, userId });
-            return res.status(400).json({ success: false, message: 'Invalid bookingId or userId format.' });
-        }
+                // ১. প্রয়োজনীয় ফিল্ড চেক
+                if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
+                    return res.status(400).json({ success: false, message: 'All required fields are needed.' });
+                }
 
-        // ৩. Transaction ID ডুপ্লিকেট চেক
-        const existingTxn = await transactionsCollection.findOne({ transactionId });
-        if (existingTxn) {
-            return res.status(400).json({ success: false, message: 'Transaction ID already exists!' });
-        }
+                // ২. ID গুলো ভ্যালিড MongoDB ObjectId কি না চেক
+                if (!ObjectId.isValid(bookingId) || !ObjectId.isValid(userId)) {
+                    console.log("Invalid ObjectId passed:", { bookingId, userId });
+                    return res.status(400).json({ success: false, message: 'Invalid bookingId or userId format.' });
+                }
 
-        // ৪. নতুন অবজেক্ট তৈরি
-        const newTransaction = {
-            bookingId: new ObjectId(bookingId),
-            userId: new ObjectId(userId),
-            amount: Number(amount),
-            paymentMethod,
-            bankName: bankName || 'N/A',
-            transactionId,
-            status: 'pending',
-            createdAt: new Date()
-        };
+                // ৩. Transaction ID ডুপ্লিকেট চেক
+                const existingTxn = await transactionsCollection.findOne({ transactionId });
+                if (existingTxn) {
+                    return res.status(400).json({ success: false, message: 'Transaction ID already exists!' });
+                }
 
-        // ৫. Transactions Collection এ ইনসার্ট
-        const txnResult = await transactionsCollection.insertOne(newTransaction);
+                // ৪. নতুন অবজেক্ট তৈরি
+                const newTransaction = {
+                    bookingId: new ObjectId(bookingId),
+                    userId: new ObjectId(userId),
+                    amount: Number(amount),
+                    paymentMethod,
+                    bankName: bankName || 'N/A',
+                    transactionId,
+                    status: 'pending',
+                    createdAt: new Date()
+                };
 
-        // ৬. Bookings Collection আপডেট
-        await bookingsCollection.updateOne(
-            { _id: new ObjectId(bookingId) },
-            { $push: { transactions: txnResult.insertedId } }
-        );
+                // ৫. Transactions Collection এ ইনসার্ট
+                const txnResult = await transactionsCollection.insertOne(newTransaction);
 
-        res.status(201).json({
-            success: true,
-            message: 'Payment request submitted successfully. Pending verification.',
-            data: { _id: txnResult.insertedId, ...newTransaction }
+                // ৬. Bookings Collection আপডেট
+                await bookingsCollection.updateOne(
+                    { _id: new ObjectId(bookingId) },
+                    { $push: { transactions: txnResult.insertedId } }
+                );
+
+                res.status(201).json({
+                    success: true,
+                    message: 'Payment request submitted successfully. Pending verification.',
+                    data: { _id: txnResult.insertedId, ...newTransaction }
+                });
+
+            } catch (error) {
+                // 🔴 আসল এররটি সার্ভার টার্মিনালে দেখতে এই console.error টি দেওয়া জরুরি
+                console.error("Error in /api/submit-payment:", error);
+                res.status(500).json({ success: false, message: error.message });
+            }
         });
-
-    } catch (error) {
-        // 🔴 আসল এররটি সার্ভার টার্মিনালে দেখতে এই console.error টি দেওয়া জরুরি
-        console.error("Error in /api/submit-payment:", error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
 
 
 
@@ -660,8 +657,6 @@ app.post('/api/submit-payment', async (req, res) => {
                     return res.status(400).json({ success: false, message: 'Invalid status value.' });
                 }
 
-                const transactionsCollection = req.db.collection('transactions');
-                const bookingsCollection = req.db.collection('bookings');
 
                 // Transaction টি খুঁজে বের করা
                 const transaction = await transactionsCollection.findOne({ _id: new ObjectId(txnId) });
