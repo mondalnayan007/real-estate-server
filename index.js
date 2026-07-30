@@ -220,6 +220,43 @@ async function connectToMongoDB() {
         // });
 
 
+        // 🔄 GET API: Query অনুযায়ী Specific Agent-এর Team Members Fetch করা
+        app.get('/api/admin/team-members', async (req, res) => {
+            try {
+                const { agentId } = req.query; // 👈 ফ্রন্টএন্ড থেকে Query string ধরা হলো (?agentId=...)
+
+                // ১. কোয়েরি অবজেক্ট তৈরি করা
+                let filterQuery = {};
+
+                // যদি ফ্রন্টএন্ড থেকে agentId পাঠানো হয়, তবেই সেটা দিয়ে ফিল্টার হবে
+                if (agentId) {
+                    filterQuery.agentId = agentId;
+                    
+                }
+
+                // ২. ডাটাবেজ থেকে ডাটা খোঁজা
+                const members = await membersCollection
+                    .find(filterQuery)
+                    .sort({ createdAt: -1 }) // নতুনগুলো সবার উপরে দেখাবে
+                    .toArray();
+
+                // ৩. রেসপন্স পাঠানো
+                res.status(200).json({
+                    success: true,
+                    count: members.length,
+                    data: members,
+                });
+
+            } catch (error) {
+                console.error('Error fetching team members:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to fetch team members.',
+                    error: error.message,
+                });
+            }
+        });
+
         app.get('/admin/transactions', async (req, res) => {
             const { bookingId } = req.query;
             const query = { bookingId: new ObjectId(bookingId) };
@@ -838,68 +875,68 @@ async function connectToMongoDB() {
 
         // posting the team member data 
 
-       app.post('/api/admin/team-members',
-  upload.single('image'), 
-  async (req, res) => {
-    try {
-      const { name, designation, bio, facebook, linkedin,agentId } = req.body;
+        app.post('/api/admin/team-members',
+            upload.single('image'),
+            async (req, res) => {
+                try {
+                    const { name, designation, bio, facebook, linkedin, agentId } = req.body;
 
-      // ১. ফর্ম ভ্যালিডেশন চেক
-      if (!name || !designation || !bio) {
-        return res.status(400).json({
-          success: false,
-          message: 'Name, designation, and bio are required fields.',
-        });
-      }
+                    // ১. ফর্ম ভ্যালিডেশন চেক
+                    if (!name || !designation || !bio) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Name, designation, and bio are required fields.',
+                        });
+                    }
 
-      // ২. ছবি আপলোড হয়েছে কিনা চেক করা
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please upload a profile image for the team member.',
-        });
-      }
+                    // ২. ছবি আপলোড হয়েছে কিনা চেক করা
+                    if (!req.file) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Please upload a profile image for the team member.',
+                        });
+                    }
 
-      // ৩. ক্লাউডিনারিতে আপলোড প্রসেসিং
-      // (আপনার ইউটিলিটি ফাংশন `uploadToCloudinary` অ্যারে গ্রহণ করে, তাই ফাইলটিকে অ্যারে আকারে পাঠানো হচ্ছে)
-      const uploadedImages = await uploadToCloudinary([req.file]);
-      const imageUrl = uploadedImages[0]; // প্রথম আপলোড হওয়া ছবির URL
+                    // ৩. ক্লাউডিনারিতে আপলোড প্রসেসিং
+                    // (আপনার ইউটিলিটি ফাংশন `uploadToCloudinary` অ্যারে গ্রহণ করে, তাই ফাইলটিকে অ্যারে আকারে পাঠানো হচ্ছে)
+                    const uploadedImages = await uploadToCloudinary([req.file]);
+                    const imageUrl = uploadedImages[0]; // প্রথম আপলোড হওয়া ছবির URL
 
-      // ৪. ডাটাবেজে সেভ করার জন্য অবজেক্ট রেডি করা
-      const newMember = {
-        name,
-        designation,
-        bio,
-        facebook: facebook || '',
-        linkedin: linkedin || '',
-        imageUrl, 
-        agentId,
-        createdAt: new Date(),
-      };
+                    // ৪. ডাটাবেজে সেভ করার জন্য অবজেক্ট রেডি করা
+                    const newMember = {
+                        name,
+                        designation,
+                        bio,
+                        facebook: facebook || '',
+                        linkedin: linkedin || '',
+                        imageUrl,
+                        agentId,
+                        createdAt: new Date(),
+                    };
 
-      // ৫. MongoDB-র membersCollection-এ ডাটা ইনসার্ট করা
-      const result = await membersCollection.insertOne(newMember);
+                    // ৫. MongoDB-র membersCollection-এ ডাটা ইনসার্ট করা
+                    const result = await membersCollection.insertOne(newMember);
 
-      // ০০০. রেসপন্স পাঠানো
-      res.status(201).json({
-        success: true,
-        message: 'Team member added successfully!',
-        data: {
-          _id: result.insertedId,
-          ...newMember,
-        },
-      });
+                    // ০০০. রেসপন্স পাঠানো
+                    res.status(201).json({
+                        success: true,
+                        message: 'Team member added successfully!',
+                        data: {
+                            _id: result.insertedId,
+                            ...newMember,
+                        },
+                    });
 
-    } catch (error) {
-      console.error('Error adding team member:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal Server Error. Failed to add team member.',
-        error: error.message,
-      });
-    }
-  }
-);
+                } catch (error) {
+                    console.error('Error adding team member:', error);
+                    res.status(500).json({
+                        success: false,
+                        message: 'Internal Server Error. Failed to add team member.',
+                        error: error.message,
+                    });
+                }
+            }
+        );
 
 
 
