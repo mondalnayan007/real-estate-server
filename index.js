@@ -36,6 +36,7 @@ async function connectToMongoDB() {
         const usersCollection = db.collection('users');
         const bookingsCollection = db.collection('bookings');
         const transactionsCollection = db.collection('transactions');
+        const membersCollection = db.collection('members');
 
 
 
@@ -833,6 +834,72 @@ async function connectToMongoDB() {
                 res.status(500).send({ success: false, message: "Internal server error while sending email." });
             }
         });
+
+
+        // posting the team member data 
+
+       app.post('/api/admin/team-members',
+  upload.single('image'), 
+  async (req, res) => {
+    try {
+      const { name, designation, bio, facebook, linkedin,agentId } = req.body;
+
+      // ১. ফর্ম ভ্যালিডেশন চেক
+      if (!name || !designation || !bio) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name, designation, and bio are required fields.',
+        });
+      }
+
+      // ২. ছবি আপলোড হয়েছে কিনা চেক করা
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please upload a profile image for the team member.',
+        });
+      }
+
+      // ৩. ক্লাউডিনারিতে আপলোড প্রসেসিং
+      // (আপনার ইউটিলিটি ফাংশন `uploadToCloudinary` অ্যারে গ্রহণ করে, তাই ফাইলটিকে অ্যারে আকারে পাঠানো হচ্ছে)
+      const uploadedImages = await uploadToCloudinary([req.file]);
+      const imageUrl = uploadedImages[0]; // প্রথম আপলোড হওয়া ছবির URL
+
+      // ৪. ডাটাবেজে সেভ করার জন্য অবজেক্ট রেডি করা
+      const newMember = {
+        name,
+        designation,
+        bio,
+        facebook: facebook || '',
+        linkedin: linkedin || '',
+        imageUrl, 
+        agentId,
+        createdAt: new Date(),
+      };
+
+      // ৫. MongoDB-র membersCollection-এ ডাটা ইনসার্ট করা
+      const result = await membersCollection.insertOne(newMember);
+
+      // ০০০. রেসপন্স পাঠানো
+      res.status(201).json({
+        success: true,
+        message: 'Team member added successfully!',
+        data: {
+          _id: result.insertedId,
+          ...newMember,
+        },
+      });
+
+    } catch (error) {
+      console.error('Error adding team member:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal Server Error. Failed to add team member.',
+        error: error.message,
+      });
+    }
+  }
+);
 
 
 
