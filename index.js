@@ -237,15 +237,10 @@ async function connectToMongoDB() {
                 // ২. ডাটাবেজ থেকে ডাটা খোঁজা
                 const members = await membersCollection
                     .find(filterQuery)
-                    .sort({ createdAt: -1 }) // নতুনগুলো সবার উপরে দেখাবে
                     .toArray();
 
                 // ৩. রেসপন্স পাঠানো
-                res.status(200).json({
-                    success: true,
-                    count: members.length,
-                    data: members,
-                });
+                res.status(200).send(members);
 
             } catch (error) {
                 console.error('Error fetching team members:', error);
