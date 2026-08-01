@@ -807,28 +807,43 @@ async function connectToMongoDB() {
 
 
         // ২. কন্টাক্ট এজেন্ট এপিআই এন্ডপয়েন্ট for email service
-        app.post('/api/contact-agent', async (req, res) => {
-            try {
-                const {
-                    userName, userEmail, userPhone, userMessage,
-                    agentEmail, agencyName,
-                    propertyTitle, propertyPrice, propertyLink
-                } = req.body;
 
-                // ডাটা ভ্যালিডেশন
-                if (!userEmail || !agentEmail || !propertyTitle) {
-                    return res.status(400).send({ success: false, message: "Required fields are missing." });
-                }
+app.post('/api/contact-agent', async (req, res) => {
+    try {
+        const {
+            propertyId,       // 👈 প্রোপার্টি আইডি
+            userName, 
+            userEmail, 
+            userPhone, 
+            userMessage, 
+            subject,          // Contact page-এর জন্য
+            agentEmail, 
+            agencyName,
+            propertyTitle, 
+            propertyPrice, 
+            propertyLink
+        } = req.body;
+       
 
-                // ৩. চিঠির খাম ও সুন্দর এইচটিএমএল (HTML) টেমপ্লেট
-                const mailOptions = {
-                    from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`, // মেইল পাঠাচ্ছে আপনার সিস্টেম
-                    to: agentEmail,      // 🎯 যে এজেন্টের প্রোপার্টি, সরাসরি তার পার্সোনাল জিমেইলে যাবে
-                    replyTo: userEmail,   // 🎯 এজেন্ট রিপ্লাই দিলে সরাসরি কাস্টমারের মেইলে চলে যাবে
-                    subject: `🔥 New Lead for "${propertyTitle}" - PrimeState`,
-                    html: `
+        // ডাটা ভ্যালিডেশন
+        if (!userEmail || !userMessage) {
+            return res.status(400).send({ success: false, message: "Email and message are required." });
+        }
+
+        let mailOptions;
+
+        // 🔀 condition: propertyId থাকলে এজেন্টের কাছে যাবে, না থাকলে এডমিনের কাছে
+        if (propertyId) {
+
+            // 🏠 ১. এজেন্টের জন্য মেইলের খাম (Agent Email Template)
+            mailOptions = {
+                from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`,
+                to: agentEmail,       // এজেন্টের পার্সোনাল মেইলে যাবে
+                replyTo: userEmail,   // রিপ্লাই দিলে সরাসরি ক্লায়েন্টের কাছে যাবে
+                subject: `🔥 New Lead for "${propertyTitle}" - PrimeState`,
+                html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <h2 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;">Hello ${agencyName},</h2>
+          <h2 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;">Hello ${agencyName || 'Agent'},</h2>
           <p style="font-size: 16px;">You have received a new customer inquiry for one of your listed properties on PrimeState.</p>
           
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
@@ -854,18 +869,55 @@ async function connectToMongoDB() {
           </p>
         </div>
       `
-                };
+            };
 
-                // ৪. নোডমেইলার দিয়ে মেইল পাঠানো
-                await transporter.sendMail(mailOptions);
+        } else {
 
-                res.status(200).send({ success: true, message: "Email sent to agent successfully!" });
+            // 📩 ২. কন্টাক্ট পেজের নরমাল মেসেজের জন্য মেইলের খাম (Contact Form Email Template)
+            mailOptions = {
+                from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`,
+                to: agentEmail,   // এডমিনের নিজস্ব মেইলে যাবে
+                replyTo: userEmail,           // রিপ্লাই দিলে সরাসরি ইউজারের কাছে যাবে
+                subject: `📩 Contact Form Message: ${subject || 'New Message'}`,
+                html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <h2 style="color: #0b4d34; border-bottom: 2px solid #0b4d34; padding-bottom: 10px;">New Message from Contact Us Page</h2>
+          <p style="font-size: 15px;">You have received a new contact submission from your website.</p>
+          
+          <div style="background-color: #fff; padding: 15px; border: 1px solid #e2e8f0; border-radius: 6px; margin: 20px 0;">
+            <h3 style="color: #0b4d34; margin-top: 0;">👤 Sender Details</h3>
+            <p style="margin: 5px 0;"><strong>Name:</strong> ${userName || 'N/A'}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail}</p>
+            <p style="margin: 5px 0;"><strong>Phone:</strong> ${userPhone || 'Not provided'}</p>
+            <p style="margin: 5px 0;"><strong>Subject:</strong> ${subject || 'General Inquiry'}</p>
+            <p style="margin: 10px 0 0 0;"><strong>Message:</strong></p>
+            <blockquote style="background: #f1f5f9; padding: 12px; border-left: 4px solid #0b4d34; margin: 5px 0; font-style: italic;">
+              "${userMessage}"
+            </blockquote>
+          </div>
+          
+          <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+            This is an automated email from PrimeState Contact Form. Hit "Reply" to respond directly to the sender.
+          </p>
+        </div>
+      `
+            };
 
-            } catch (error) {
-                console.error("Nodemailer Error:", error);
-                res.status(500).send({ success: false, message: "Internal server error while sending email." });
-            }
+        }
+
+        // ✉️ মেইল সেন্ড করা
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).send({ 
+            success: true, 
+            message: propertyId ? "Email sent to agent successfully!" : "Contact message sent successfully!" 
         });
+
+    } catch (error) {
+        console.error("Nodemailer Error:", error);
+        res.status(500).send({ success: false, message: "Internal server error while sending email." });
+    }
+});
 
 
         // posting the team member data 
