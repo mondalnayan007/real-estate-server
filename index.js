@@ -334,6 +334,7 @@ async function connectToMongoDB() {
                     location,
                     category,
                     tag,
+                    land,
                     status,
                     description,
                     brochureLink,
@@ -342,6 +343,7 @@ async function connectToMongoDB() {
                     bookingPrice,
                     buildingType,
                     frontRoad,
+                    floors,
                     unitPerFloor,
                     passengerLift,
                     cargoLift,
@@ -388,6 +390,7 @@ async function connectToMongoDB() {
                     location: location || "",
                     category: category || "Apartments",
                     tag: tag || "",
+                    land:land || "",
                     status: status || "completed",
                     description: description || "",
                     brochureLink: brochureLink || "",
@@ -402,6 +405,7 @@ async function connectToMongoDB() {
 
                     // Building Specifications
                     buildingType: buildingType || "Residential",
+                    floors:floors || 'B+G+6',
                     frontRoad: frontRoad || "",
                     unitPerFloor: Number(unitPerFloor) || 0,
                     passengerLift: Number(passengerLift) || 0,
