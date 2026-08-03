@@ -37,6 +37,7 @@ async function connectToMongoDB() {
         const bookingsCollection = db.collection('bookings');
         const transactionsCollection = db.collection('transactions');
         const membersCollection = db.collection('members');
+        const blogsCollection = db.collection('blogs');
 
 
 
@@ -627,6 +628,86 @@ async function connectToMongoDB() {
                 res.status(500).json({ success: false, message: "Internal server error during booking." });
             }
         });
+
+
+        // blogs post api 
+
+
+       app.post('/api/blogs', upload.single('image'), async (req, res) => {
+  try {
+    const { title, category, excerpt, content, readTime, author, tags, socials } = req.body;
+
+    // ১. ব্যাকএন্ড ভ্যালিডেশন
+    if (!title || !req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title and cover image are required!' 
+      });
+    }
+
+    // ২. ক্লাউডিনারিতে ইমেজ আপলোড (Memory Buffer handle)
+    let imageUrl = '';
+    if (req.file) {
+      const uploadResult = await uploadToCloudinary([req.file]); // array তে পাস করা হচ্ছে
+      if (uploadResult.length > 0) {
+        imageUrl = uploadResult[0];
+      }
+    }
+
+    // ৩. FormData এর মাধ্যমে পাঠানো Tags (Array) এবং Socials (Object) Parse করা
+    let parsedTags = [];
+    let parsedSocials = { facebook: '', linkedin: '', pinterest: '', twitter: '' };
+
+    if (tags) {
+      try {
+        parsedTags = JSON.parse(tags);
+      } catch (err) {
+        parsedTags = [];
+      }
+    }
+
+    if (socials) {
+      try {
+        parsedSocials = JSON.parse(socials);
+      } catch (err) {
+        parsedSocials = {};
+      }
+    }
+
+    // ৪. MongoDB তে সেভ করার জন্য ডকুমেন্ট তৈরি
+    const newBlog = {
+      title,
+      category: category || 'Market Insights',
+      excerpt: excerpt || '',
+      content: content || '',
+      readTime: readTime || '5 min read',
+      author: author || 'Admin',
+      img: imageUrl, // Cloudinary Image URL
+      tags: parsedTags, // ['RealEstate', 'Dhaka']
+      socials: parsedSocials, // { facebook: '...', linkedin: '...' }
+      createdAt: new Date(),
+      publishedDate: new Date().toISOString().split('T')[0] // 'YYYY-MM-DD'
+    };
+
+    // 🗄️ ৫. MongoDB Collection এ ডাটা ইনসার্ট
+    const result = await blogsCollection.insertOne(newBlog);
+
+    res.status(201).json({
+      success: true,
+      message: 'Blog published successfully!',
+      blogId: result.insertedId,
+      blog: newBlog
+    });
+
+  } catch (error) {
+    console.error('Error uploading blog:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload blog to server or Cloudinary.',
+      error: error.message
+    });
+  }
+});
 
 
 
