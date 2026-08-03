@@ -607,6 +607,14 @@ async function connectToMongoDB() {
                 // 💥 'bookings' কালেকশনে ইনসার্ট
                 const bookingResult = await bookingsCollection.insertOne(newBookingDocument);
 
+                // 🌟 ৩. projectsCollection-এ totalShares ১ বাড়াবে ($inc অপারেটর ব্যবহার করে)
+        if (projectId) {
+            await projectsCollection.updateOne(
+                { _id: new ObjectId(projectId) }, // আপনার DB-তে projectId স্ট্রিং হলে ObjectId() সরিয়ে সরাসরি projectId ব্যবহার করুন
+                { $inc: { totalShares: 1 } } // totalShares এর ভ্যালু ১ বাড়িয়ে দেবে
+            );
+        }
+
                 res.status(201).json({
                     success: true,
                     message: "Booking application submitted successfully!",
