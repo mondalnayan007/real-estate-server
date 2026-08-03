@@ -635,7 +635,7 @@ async function connectToMongoDB() {
 
        app.post('/api/blogs', upload.single('image'), async (req, res) => {
   try {
-    const { title, category, excerpt, content, readTime, author, tags, socials } = req.body;
+    const { title, category, excerpt, content, readTime, author, agentId, tags, socials } = req.body;
 
     // ১. ব্যাকএন্ড ভ্যালিডেশন
     if (!title || !req.file) {
@@ -684,6 +684,7 @@ async function connectToMongoDB() {
       author: author || 'Admin',
       img: imageUrl, // Cloudinary Image URL
       tags: parsedTags, // ['RealEstate', 'Dhaka']
+      agentId:agentId,
       socials: parsedSocials, // { facebook: '...', linkedin: '...' }
       createdAt: new Date(),
       publishedDate: new Date().toISOString().split('T')[0] // 'YYYY-MM-DD'
