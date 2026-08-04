@@ -261,16 +261,42 @@ async function connectToMongoDB() {
         })
 
 
-        app.get('/api/blogs', async (req, res) => {
+        // blog collection find api 
+
+                app.get('/api/blogs', async (req, res) => {
             try {
-                const {agentId} = req.query;
-                 const query = {agentId : agentId};
-                const blogs = await blogsCollection.find(query).sort({ createdAt: -1 }).toArray();
-                res.status(200).json(blogs);
+                const { agentId, id } = req.query;
+
+                if (agentId && id) {
+                    const query = { agentId: agentId, _id: new ObjectId(id) };
+                    const result = await blogsCollection.findOne(query);
+
+                    if (!result) {
+                        return res.status(404).send({ message: "We dont get the blog" });
+                    }
+                    return res.send(result);
+                }
+
+
+                if (agentId) {
+                    const query = { agentId: agentId };
+                    const result = await blogsCollection.find(query).sort({createdAt: -1}).toArray();
+                    return res.send(result);
+                }
+
+
+                const result = await blogsCollection.find().toArray();
+                res.send(result);
+
             } catch (error) {
-                res.status(500).json({ success: false, message: 'Failed to fetch blogs' });
+                console.error(error);
+                res.status(500).send({ message: "Server error", error });
             }
         });
+
+
+
+      
 
 
 
