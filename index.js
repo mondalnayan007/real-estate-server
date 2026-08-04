@@ -232,7 +232,7 @@ async function connectToMongoDB() {
                 // যদি ফ্রন্টএন্ড থেকে agentId পাঠানো হয়, তবেই সেটা দিয়ে ফিল্টার হবে
                 if (agentId) {
                     filterQuery.agentId = agentId;
-                    
+
                 }
 
                 // ২. ডাটাবেজ থেকে ডাটা খোঁজা
@@ -259,6 +259,18 @@ async function connectToMongoDB() {
             const result = await transactionsCollection.find(query).toArray();
             res.send(result);
         })
+
+
+        app.get('/api/blogs', async (req, res) => {
+            try {
+                const {agentId} = req.query;
+                 const query = {agentId : agentId};
+                const blogs = await blogsCollection.find(query).sort({ createdAt: -1 }).toArray();
+                res.status(200).json(blogs);
+            } catch (error) {
+                res.status(500).json({ success: false, message: 'Failed to fetch blogs' });
+            }
+        });
 
 
 
@@ -391,7 +403,7 @@ async function connectToMongoDB() {
                     location: location || "",
                     category: category || "Apartments",
                     tag: tag || "",
-                    land:land || "",
+                    land: land || "",
                     status: status || "completed",
                     description: description || "",
                     brochureLink: brochureLink || "",
@@ -406,7 +418,7 @@ async function connectToMongoDB() {
 
                     // Building Specifications
                     buildingType: buildingType || "Residential",
-                    floors:floors || 'B+G+6',
+                    floors: floors || 'B+G+6',
                     frontRoad: frontRoad || "",
                     unitPerFloor: Number(unitPerFloor) || 0,
                     passengerLift: Number(passengerLift) || 0,
@@ -609,12 +621,12 @@ async function connectToMongoDB() {
                 const bookingResult = await bookingsCollection.insertOne(newBookingDocument);
 
                 // 🌟 ৩. projectsCollection-এ totalShares ১ বাড়াবে ($inc অপারেটর ব্যবহার করে)
-        if (projectId) {
-            await projectsCollection.updateOne(
-                { _id: new ObjectId(projectId) }, // আপনার DB-তে projectId স্ট্রিং হলে ObjectId() সরিয়ে সরাসরি projectId ব্যবহার করুন
-                { $inc: { totalShares: 1 } } // totalShares এর ভ্যালু ১ বাড়িয়ে দেবে
-            );
-        }
+                if (projectId) {
+                    await projectsCollection.updateOne(
+                        { _id: new ObjectId(projectId) }, // আপনার DB-তে projectId স্ট্রিং হলে ObjectId() সরিয়ে সরাসরি projectId ব্যবহার করুন
+                        { $inc: { totalShares: 1 } } // totalShares এর ভ্যালু ১ বাড়িয়ে দেবে
+                    );
+                }
 
                 res.status(201).json({
                     success: true,
@@ -633,82 +645,82 @@ async function connectToMongoDB() {
         // blogs post api 
 
 
-       app.post('/api/blogs', upload.single('image'), async (req, res) => {
-  try {
-    const { title, category, excerpt, content, readTime, author, agentId, tags, socials } = req.body;
+        app.post('/api/blogs', upload.single('image'), async (req, res) => {
+            try {
+                const { title, category, excerpt, content, readTime, author, agentId, tags, socials } = req.body;
 
-    // ১. ব্যাকএন্ড ভ্যালিডেশন
-    if (!title || !req.file) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Title and cover image are required!' 
-      });
-    }
+                // ১. ব্যাকএন্ড ভ্যালিডেশন
+                if (!title || !req.file) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Title and cover image are required!'
+                    });
+                }
 
-    // ২. ক্লাউডিনারিতে ইমেজ আপলোড (Memory Buffer handle)
-    let imageUrl = '';
-    if (req.file) {
-      const uploadResult = await uploadToCloudinary([req.file]); // array তে পাস করা হচ্ছে
-      if (uploadResult.length > 0) {
-        imageUrl = uploadResult[0];
-      }
-    }
+                // ২. ক্লাউডিনারিতে ইমেজ আপলোড (Memory Buffer handle)
+                let imageUrl = '';
+                if (req.file) {
+                    const uploadResult = await uploadToCloudinary([req.file]); // array তে পাস করা হচ্ছে
+                    if (uploadResult.length > 0) {
+                        imageUrl = uploadResult[0];
+                    }
+                }
 
-    // ৩. FormData এর মাধ্যমে পাঠানো Tags (Array) এবং Socials (Object) Parse করা
-    let parsedTags = [];
-    let parsedSocials = { facebook: '', linkedin: '', pinterest: '', twitter: '' };
+                // ৩. FormData এর মাধ্যমে পাঠানো Tags (Array) এবং Socials (Object) Parse করা
+                let parsedTags = [];
+                let parsedSocials = { facebook: '', linkedin: '', pinterest: '', twitter: '' };
 
-    if (tags) {
-      try {
-        parsedTags = JSON.parse(tags);
-      } catch (err) {
-        parsedTags = [];
-      }
-    }
+                if (tags) {
+                    try {
+                        parsedTags = JSON.parse(tags);
+                    } catch (err) {
+                        parsedTags = [];
+                    }
+                }
 
-    if (socials) {
-      try {
-        parsedSocials = JSON.parse(socials);
-      } catch (err) {
-        parsedSocials = {};
-      }
-    }
+                if (socials) {
+                    try {
+                        parsedSocials = JSON.parse(socials);
+                    } catch (err) {
+                        parsedSocials = {};
+                    }
+                }
 
-    // ৪. MongoDB তে সেভ করার জন্য ডকুমেন্ট তৈরি
-    const newBlog = {
-      title,
-      category: category || 'Market Insights',
-      excerpt: excerpt || '',
-      content: content || '',
-      readTime: readTime || '5 min read',
-      author: author || 'Admin',
-      img: imageUrl, // Cloudinary Image URL
-      tags: parsedTags, // ['RealEstate', 'Dhaka']
-      agentId:agentId,
-      socials: parsedSocials, // { facebook: '...', linkedin: '...' }
-      createdAt: new Date(),
-      publishedDate: new Date().toISOString().split('T')[0] // 'YYYY-MM-DD'
-    };
+                // ৪. MongoDB তে সেভ করার জন্য ডকুমেন্ট তৈরি
+                const newBlog = {
+                    title,
+                    category: category || 'Market Insights',
+                    excerpt: excerpt || '',
+                    content: content || '',
+                    readTime: readTime || '5 min read',
+                    author: author || 'Admin',
+                    img: imageUrl, // Cloudinary Image URL
+                    tags: parsedTags, // ['RealEstate', 'Dhaka']
+                    agentId: agentId,
+                    socials: parsedSocials, // { facebook: '...', linkedin: '...' }
+                    createdAt: new Date(),
+                    publishedDate: new Date().toISOString().split('T')[0] // 'YYYY-MM-DD'
+                };
 
-    // 🗄️ ৫. MongoDB Collection এ ডাটা ইনসার্ট
-    const result = await blogsCollection.insertOne(newBlog);
+                // 🗄️ ৫. MongoDB Collection এ ডাটা ইনসার্ট
+                const result = await blogsCollection.insertOne(newBlog);
 
-    res.status(201).json({
-      success: true,
-      message: 'Blog published successfully!',
-      blogId: result.insertedId,
-      blog: newBlog
-    });
+                res.status(201).json({
+                    success: true,
+                    message: 'Blog published successfully!',
+                    blogId: result.insertedId,
+                    blog: newBlog
+                });
 
-  } catch (error) {
-    console.error('Error uploading blog:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to upload blog to server or Cloudinary.',
-      error: error.message
-    });
-  }
-});
+            } catch (error) {
+                console.error('Error uploading blog:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to upload blog to server or Cloudinary.',
+                    error: error.message
+                });
+            }
+        });
 
 
 
@@ -902,40 +914,40 @@ async function connectToMongoDB() {
 
         // ২. কন্টাক্ট এজেন্ট এপিআই এন্ডপয়েন্ট for email service
 
-app.post('/api/contact-agent', async (req, res) => {
-    try {
-        const {
-            propertyId,       // 👈 প্রোপার্টি আইডি
-            userName, 
-            userEmail, 
-            userPhone, 
-            userMessage, 
-            subject,          // Contact page-এর জন্য
-            agentEmail, 
-            agencyName,
-            propertyTitle, 
-            propertyPrice, 
-            propertyLink
-        } = req.body;
-       
+        app.post('/api/contact-agent', async (req, res) => {
+            try {
+                const {
+                    propertyId,       // 👈 প্রোপার্টি আইডি
+                    userName,
+                    userEmail,
+                    userPhone,
+                    userMessage,
+                    subject,          // Contact page-এর জন্য
+                    agentEmail,
+                    agencyName,
+                    propertyTitle,
+                    propertyPrice,
+                    propertyLink
+                } = req.body;
 
-        // ডাটা ভ্যালিডেশন
-        if (!userEmail || !userMessage) {
-            return res.status(400).send({ success: false, message: "Email and message are required." });
-        }
 
-        let mailOptions;
+                // ডাটা ভ্যালিডেশন
+                if (!userEmail || !userMessage) {
+                    return res.status(400).send({ success: false, message: "Email and message are required." });
+                }
 
-        // 🔀 condition: propertyId থাকলে এজেন্টের কাছে যাবে, না থাকলে এডমিনের কাছে
-        if (propertyId) {
+                let mailOptions;
 
-            // 🏠 ১. এজেন্টের জন্য মেইলের খাম (Agent Email Template)
-            mailOptions = {
-                from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`,
-                to: agentEmail,       // এজেন্টের পার্সোনাল মেইলে যাবে
-                replyTo: userEmail,   // রিপ্লাই দিলে সরাসরি ক্লায়েন্টের কাছে যাবে
-                subject: `🔥 New Lead for "${propertyTitle}" - PrimeState`,
-                html: `
+                // 🔀 condition: propertyId থাকলে এজেন্টের কাছে যাবে, না থাকলে এডমিনের কাছে
+                if (propertyId) {
+
+                    // 🏠 ১. এজেন্টের জন্য মেইলের খাম (Agent Email Template)
+                    mailOptions = {
+                        from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`,
+                        to: agentEmail,       // এজেন্টের পার্সোনাল মেইলে যাবে
+                        replyTo: userEmail,   // রিপ্লাই দিলে সরাসরি ক্লায়েন্টের কাছে যাবে
+                        subject: `🔥 New Lead for "${propertyTitle}" - PrimeState`,
+                        html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
           <h2 style="color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;">Hello ${agencyName || 'Agent'},</h2>
           <p style="font-size: 16px;">You have received a new customer inquiry for one of your listed properties on PrimeState.</p>
@@ -963,17 +975,17 @@ app.post('/api/contact-agent', async (req, res) => {
           </p>
         </div>
       `
-            };
+                    };
 
-        } else {
+                } else {
 
-            // 📩 ২. কন্টাক্ট পেজের নরমাল মেসেজের জন্য মেইলের খাম (Contact Form Email Template)
-            mailOptions = {
-                from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`,
-                to: agentEmail,   // এডমিনের নিজস্ব মেইলে যাবে
-                replyTo: userEmail,           // রিপ্লাই দিলে সরাসরি ইউজারের কাছে যাবে
-                subject: `📩 Contact Form Message: ${subject || 'New Message'}`,
-                html: `
+                    // 📩 ২. কন্টাক্ট পেজের নরমাল মেসেজের জন্য মেইলের খাম (Contact Form Email Template)
+                    mailOptions = {
+                        from: `"PrimeState Portal" <${process.env.EMAIL_USER}>`,
+                        to: agentEmail,   // এডমিনের নিজস্ব মেইলে যাবে
+                        replyTo: userEmail,           // রিপ্লাই দিলে সরাসরি ইউজারের কাছে যাবে
+                        subject: `📩 Contact Form Message: ${subject || 'New Message'}`,
+                        html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
           <h2 style="color: #0b4d34; border-bottom: 2px solid #0b4d34; padding-bottom: 10px;">New Message from Contact Us Page</h2>
           <p style="font-size: 15px;">You have received a new contact submission from your website.</p>
@@ -995,23 +1007,23 @@ app.post('/api/contact-agent', async (req, res) => {
           </p>
         </div>
       `
-            };
+                    };
 
-        }
+                }
 
-        // ✉️ মেইল সেন্ড করা
-        await transporter.sendMail(mailOptions);
+                // ✉️ মেইল সেন্ড করা
+                await transporter.sendMail(mailOptions);
 
-        res.status(200).send({ 
-            success: true, 
-            message: propertyId ? "Email sent to agent successfully!" : "Contact message sent successfully!" 
+                res.status(200).send({
+                    success: true,
+                    message: propertyId ? "Email sent to agent successfully!" : "Contact message sent successfully!"
+                });
+
+            } catch (error) {
+                console.error("Nodemailer Error:", error);
+                res.status(500).send({ success: false, message: "Internal server error while sending email." });
+            }
         });
-
-    } catch (error) {
-        console.error("Nodemailer Error:", error);
-        res.status(500).send({ success: false, message: "Internal server error while sending email." });
-    }
-});
 
 
         // posting the team member data 
