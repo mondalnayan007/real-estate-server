@@ -263,7 +263,7 @@ async function connectToMongoDB() {
 
         // blog collection find api 
 
-                app.get('/api/blogs', async (req, res) => {
+        app.get('/api/blogs', async (req, res) => {
             try {
                 const { agentId, id } = req.query;
 
@@ -280,7 +280,7 @@ async function connectToMongoDB() {
 
                 if (agentId) {
                     const query = { agentId: agentId };
-                    const result = await blogsCollection.find(query).sort({createdAt: -1}).toArray();
+                    const result = await blogsCollection.find(query).sort({ createdAt: -1 }).toArray();
                     return res.send(result);
                 }
 
@@ -296,7 +296,7 @@ async function connectToMongoDB() {
 
 
 
-      
+
 
 
 
@@ -646,13 +646,7 @@ async function connectToMongoDB() {
                 // 💥 'bookings' কালেকশনে ইনসার্ট
                 const bookingResult = await bookingsCollection.insertOne(newBookingDocument);
 
-                // 🌟 ৩. projectsCollection-এ totalShares ১ বাড়াবে ($inc অপারেটর ব্যবহার করে)
-                if (projectId) {
-                    await projectsCollection.updateOne(
-                        { _id: new ObjectId(projectId) }, // আপনার DB-তে projectId স্ট্রিং হলে ObjectId() সরিয়ে সরাসরি projectId ব্যবহার করুন
-                        { $inc: { totalShares: 1 } } // totalShares এর ভ্যালু ১ বাড়িয়ে দেবে
-                    );
-                }
+              
 
                 res.status(201).json({
                     success: true,
@@ -822,8 +816,7 @@ async function connectToMongoDB() {
                     return res.status(400).json({ success: false, message: 'Invalid status value.' });
                 }
 
-
-                // Transaction টি খুঁজে বের করা
+                // ১. Transaction টি খুঁজে বের করা
                 const transaction = await transactionsCollection.findOne({ _id: new ObjectId(txnId) });
 
                 if (!transaction) {
@@ -834,23 +827,37 @@ async function connectToMongoDB() {
                     return res.status(400).json({ success: false, message: 'Transaction is already approved.' });
                 }
 
-                // ১. Transaction এর স্ট্যাটাস আপডেট করা
+                // ২. Transaction এর স্ট্যাটাস আপডেট করা
                 await transactionsCollection.updateOne(
                     { _id: new ObjectId(txnId) },
                     { $set: { status: status, updatedAt: new Date() } }
                 );
 
-                // ২. এডমিন যদি APPROVE করে, তবে সাথে সাথে Booking-এর totalPaid অটোমেটিক বেড়ে যাবে
+                // ৩. এডমিন যদি APPROVE করে
                 if (status === 'approved') {
-                    await bookingsCollection.updateOne(
-                        { _id: new ObjectId(transaction.bookingId) },
-                        { $inc: { totalPaid: Number(transaction.amount) } } // $inc অটো টাকা যোগ করবে
-                    );
+                    // ৩.১ Booking ডকুমেন্ট খুঁজে বের করা (যাতে projectId পাওয়া যায়)
+                    const booking = await bookingsCollection.findOne({ _id: new ObjectId(transaction.bookingId) });
+
+                    if (booking) {
+                        // ৩.২ Booking এর totalPaid বৃদ্ধি করা
+                        await bookingsCollection.updateOne(
+                            { _id: new ObjectId(transaction.bookingId) },
+                            { $inc: { totalPaid: Number(transaction.amount) } }
+                        );
+
+                        // ৩.৩ Booking-এ থাকা projectId ব্যবহার করে Projects-এর totalShare ১ বাড়ানো
+                        if (booking.projectId) {
+                            await projectsCollection.updateOne(
+                                { _id: new ObjectId(booking.projectId) },
+                                { $inc: { totalShare: 1 } } // totalShare ১ করে বাড়াবে
+                            );
+                        }
+                    }
                 }
 
                 res.status(200).json({
                     success: true,
-                    message: `Transaction ${status} successfully!`
+                    message: `Transaction ${status} successfully and project share updated!`
                 });
 
             } catch (error) {
