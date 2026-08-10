@@ -132,6 +132,7 @@ async function connectToMongoDB() {
         app.get('/api/my-bookings', async (req, res) => {
             try {
                 const { userId } = req.query;
+                
 
                 // ১. userId না থাকলে বা ইনভ্যালিড ObjectId হলে হ্যান্ডেল করা
                 if (!userId || !ObjectId.isValid(userId)) {
@@ -749,7 +750,6 @@ async function connectToMongoDB() {
         app.post('/api/submit-payment', async (req, res) => {
             try {
                 const { bookingId, userId, amount, paymentMethod, bankName, transactionId } = req.body;
-
                 // ১. প্রয়োজনীয় ফিল্ড চেক
                 if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
                     return res.status(400).json({ success: false, message: 'All required fields are needed.' });
