@@ -260,12 +260,39 @@ app.get('/api/my-bookings', async (req, res) => {
             }
         });
 
-        app.get('/admin/transactions', async (req, res) => {
-            const { bookingId } = req.query;
-            const query = { bookingId: new ObjectId(bookingId) };
-            const result = await transactionsCollection.find(query).toArray();
-            res.send(result);
-        })
+     app.get('/admin/transactions', async (req, res) => {
+    try {
+        const { bookingId } = req.query;
+
+        // ১. bookingId চেক এবং ObjectId ভ্যালিডেশন
+        if (!bookingId || !ObjectId.isValid(bookingId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid Booking ID is required'
+            });
+        }
+
+        // ২. ট্রানজ্যাকশন খোঁজা এবং সর্বশেষ পেমেন্ট আগে সাজানো (Descending Order)
+        const query = { bookingId: new ObjectId(bookingId) };
+        const transactions = await transactionsCollection
+            .find(query)
+            .sort({ createdAt: -1, _id: -1 })
+            .toArray();
+
+        // ৩. স্ট্যান্ডার্ড রেসপন্স ব্যাক করা
+        res.json({
+            success: true,
+            transactions
+        });
+
+    } catch (error) {
+        console.error('Error fetching transactions:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching transactions'
+        });
+    }
+});
 
 
         // blog collection find api 
