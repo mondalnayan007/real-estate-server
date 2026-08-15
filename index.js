@@ -876,63 +876,103 @@ app.get('/api/my-bookings', async (req, res) => {
         // ==========================================
         // ৩. এডমিন প্যানেল: Approve / Reject করার API
         // ==========================================
-        app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
-            try {
-                const { txnId } = req.params;
-                const { status } = req.body; // 'approved' অথবা 'rejected'
+app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
+    try {
+        const { txnId } = req.params;
+        const { status } = req.body; // 'approved' অথবা 'rejected'
 
-                if (!['approved', 'rejected'].includes(status)) {
-                    return res.status(400).json({ success: false, message: 'Invalid status value.' });
+        // ১. ইনপুট ও ObjectId ভ্যালিডেশন
+        if (!['approved', 'rejected'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid status value.' });
+        }
+
+        if (!ObjectId.isValid(txnId)) {
+            return res.status(400).json({ success: false, message: 'Invalid Transaction ID format.' });
+        }
+
+        // ২. Transaction টি খুঁজে বের করা
+        const transaction = await transactionsCollection.findOne({ _id: new ObjectId(txnId) });
+
+        if (!transaction) {
+            return res.status(404).json({ success: false, message: 'Transaction not found.' });
+        }
+
+        // যদি স্ট্যাটাস ইতিমধ্যেই একই থাকে তবে রিডান্ড্যান্ট অপারেশন এড়ানো
+        if (transaction.status === status) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Transaction is already marked as ${status}.` 
+            });
+        }
+
+        const previousStatus = transaction.status;
+        const amount = Number(transaction.amount) || 0;
+
+        // ৩. Transaction এর স্ট্যাটাস আপডেট করা
+        await transactionsCollection.updateOne(
+            { _id: new ObjectId(txnId) },
+            { $set: { status: status, updatedAt: new Date() } }
+        );
+
+        // ৪. Booking ও Project আপডেট হ্যান্ডলিং
+        if (transaction.bookingId && ObjectId.isValid(transaction.bookingId)) {
+            const booking = await bookingsCollection.findOne({ _id: new ObjectId(transaction.bookingId) });
+
+            if (booking) {
+                let paidIncrement = 0;
+                let shareIncrement = 0;
+
+                // Case A: Pending/Rejected -> Approved (পেমেন্ট যোগ হবে)
+                if (status === 'approved' && previousStatus !== 'approved') {
+                    paidIncrement = amount;
+                    shareIncrement = 1;
+                }
+                // Case B: Approved -> Rejected (আগের পেমেন্ট রিভার্স/বিয়োগ হবে)
+                else if (status === 'rejected' && previousStatus === 'approved') {
+                    paidIncrement = -amount;
+                    shareIncrement = -1;
                 }
 
-                // ১. Transaction টি খুঁজে বের করা
-                const transaction = await transactionsCollection.findOne({ _id: new ObjectId(txnId) });
+                // ৪.১ Bookings Collection আপডেট (totalPaid ও totalDue সিঙ্ক)
+                if (paidIncrement !== 0) {
+                    const currentTotalPaid = Number(booking.totalPaid) || 0;
+                    const newTotalPaid = Math.max(0, currentTotalPaid + paidIncrement);
+                    const totalAmount = Number(booking.totalAmount) || 0;
+                    const newTotalDue = Math.max(0, totalAmount - newTotalPaid);
 
-                if (!transaction) {
-                    return res.status(404).json({ success: false, message: 'Transaction not found.' });
-                }
-
-                if (transaction.status === 'approved') {
-                    return res.status(400).json({ success: false, message: 'Transaction is already approved.' });
-                }
-
-                // ২. Transaction এর স্ট্যাটাস আপডেট করা
-                await transactionsCollection.updateOne(
-                    { _id: new ObjectId(txnId) },
-                    { $set: { status: status, updatedAt: new Date() } }
-                );
-
-                // ৩. এডমিন যদি APPROVE করে
-                if (status === 'approved') {
-                    // ৩.১ Booking ডকুমেন্ট খুঁজে বের করা (যাতে projectId পাওয়া যায়)
-                    const booking = await bookingsCollection.findOne({ _id: new ObjectId(transaction.bookingId) });
-
-                    if (booking) {
-                        // ৩.২ Booking এর totalPaid বৃদ্ধি করা
-                        await bookingsCollection.updateOne(
-                            { _id: new ObjectId(transaction.bookingId) },
-                            { $inc: { totalPaid: Number(transaction.amount) } }
-                        );
-
-                        // ৩.৩ Booking-এ থাকা projectId ব্যবহার করে Projects-এর totalShare ১ বাড়ানো
-                        if (booking.projectId) {
-                            await projectsCollection.updateOne(
-                                { _id: new ObjectId(booking.projectId) },
-                                { $inc: { totalShare: 1 } } // totalShare ১ করে বাড়াবে
-                            );
+                    await bookingsCollection.updateOne(
+                        { _id: new ObjectId(transaction.bookingId) },
+                        { 
+                            $set: { 
+                                totalPaid: newTotalPaid,
+                                totalDue: newTotalDue,
+                                updatedAt: new Date()
+                            } 
                         }
-                    }
+                    );
                 }
 
-                res.status(200).json({
-                    success: true,
-                    message: `Transaction ${status} successfully and project share updated!`
-                });
-
-            } catch (error) {
-                res.status(500).json({ success: false, message: error.message });
+                // ৪.২ Projects Collection-এ totalShare সিঙ্ক
+                if (shareIncrement !== 0 && booking.projectId && ObjectId.isValid(booking.projectId)) {
+                    await projectsCollection.updateOne(
+                        { _id: new ObjectId(booking.projectId) },
+                        { $inc: { totalShare: shareIncrement } }
+                    );
+                }
             }
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Transaction status updated to '${status}' successfully.`,
+            data: { txnId, status }
         });
+
+    } catch (error) {
+        console.error("Error in /api/admin/update-payment-status:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 
         // ------------------------------------------------------------------
