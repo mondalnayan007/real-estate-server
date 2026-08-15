@@ -367,6 +367,8 @@ app.get('/api/my-bookings', async (req, res) => {
                     bookingId: 1,
                     userId: 1,
                     amount: 1,
+                    paymentType:1,
+                    senderName:1,
                     paymentMethod: 1,
                     bankName: 1,
                     transactionId: 1,
@@ -787,8 +789,9 @@ app.get('/api/my-bookings', async (req, res) => {
 
     app.post('/api/submit-payment', async (req, res) => {
     try {
-        const { bookingId, userId, amount, paymentMethod, bankName, transactionId } = req.body;
+        const { bookingId, userId, amount, paymentMethod, bankName, transactionId,paymentType,senderName} = req.body;
 
+        
         // ১. প্রয়োজনীয় ফিল্ড চেক
         if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
             return res.status(400).json({ 
@@ -842,6 +845,8 @@ app.get('/api/my-bookings', async (req, res) => {
             bookingId: new ObjectId(bookingId),
             userId: new ObjectId(userId),
             amount: numericAmount,
+            paymentType:paymentType,
+            senderName:senderName,
             paymentMethod: String(paymentMethod).trim(),
             bankName: bankName ? String(bankName).trim() : 'N/A',
             transactionId: formattedTxnId,
