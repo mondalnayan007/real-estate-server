@@ -338,59 +338,64 @@ app.get('/api/my-bookings', async (req, res) => {
         // ==========================================
         // ২. এডমিন প্যানেল: অল ট্রানজ্যাকশন লিস্ট পাওয়ার API (Pending, Approved & Rejected)
         // ==========================================
-        app.get('/api/admin/pending-payments', async (req, res) => {
-            try {
-                // Aggregate দিয়ে User এবং Booking-এর সাথে JOIN করা
-                // 🔥 $match থেকে status: 'pending' সরিয়ে দেওয়া হলো যাতে সব ডাটা রিটার্ন করে
-                const allTxns = await transactionsCollection.aggregate([
-                    { $sort: { createdAt: -1 } }, // নতুন ট্রানজ্যাকশন সবার উপরে থাকবে
-                    {
-                        $lookup: {
-                            from: 'users',
-                            localField: 'userId',
-                            foreignField: '_id',
-                            as: 'user'
-                        }
-                    },
-                    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-                    {
-                        $lookup: {
-                            from: 'bookings',
-                            localField: 'bookingId',
-                            foreignField: '_id',
-                            as: 'booking'
-                        }
-                    },
-                    { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
-                    {
-                        $project: {
-                            amount: 1,
-                            paymentMethod: 1,
-                            bankName: 1,
-                            transactionId: 1,
-                            status: 1, // status: 'approved', 'rejected', or 'pending'
-                            createdAt: 1,
-                            'user.name': 1,
-                            'user.email': 1,
-                            'user.phone': 1,
-                            'booking.projectName': 1,
-                            'booking.totalAmount': 1,
-                            'booking.totalPaid': 1
-                        }
-                    }
-                ]).toArray();
-
-                res.status(200).json({
-                    success: true,
-                    count: allTxns.length,
-                    data: allTxns
-                });
-
-            } catch (error) {
-                console.error("Error fetching transactions:", error);
-                res.status(500).json({ success: false, message: error.message });
+  app.get('/api/admin/pending-payments', async (req, res) => {
+    try {
+        // Aggregate দিয়ে User এবং Booking-এর সাথে JOIN করা
+        const allTxns = await transactionsCollection.aggregate([
+            { $sort: { createdAt: -1, _id: -1 } }, // নতুন ট্রানজ্যাকশন সবার উপরে
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'bookings',
+                    localField: 'bookingId',
+                    foreignField: '_id',
+                    as: 'booking'
+                }
+            },
+            { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    bookingId: 1,
+                    userId: 1,
+                    amount: 1,
+                    paymentMethod: 1,
+                    bankName: 1,
+                    transactionId: 1,
+                    status: 1, // 'approved', 'rejected', or 'pending'
+                    createdAt: 1,
+                    'user._id': 1,
+                    'user.name': 1,
+                    'user.email': 1,
+                    'user.phone': 1,
+                    'booking._id': 1,
+                    'booking.projectName': 1,
+                    'booking.totalAmount': 1,
+                    'booking.totalPaid': 1,
+                    'booking.totalDue': 1
+                }
             }
+        ]).toArray();
+
+        res.status(200).json({
+            success: true,
+            count: allTxns.length,
+            data: allTxns
         });
+
+    } catch (error) {
+        console.error("Error fetching transactions:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 
         // post apis here 
