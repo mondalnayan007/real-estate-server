@@ -129,60 +129,66 @@ async function connectToMongoDB() {
 
 
 
-        app.get('/api/my-bookings', async (req, res) => {
-            try {
-                const { userId } = req.query;
-                
+app.get('/api/my-bookings', async (req, res) => {
+    try {
+        const { userId } = req.query;
 
-                // ১. userId না থাকলে বা ইনভ্যালিড ObjectId হলে হ্যান্ডেল করা
-                if (!userId || !ObjectId.isValid(userId)) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Valid User ID is required'
-                    });
-                }
+        // ১. userId ভ্যালিডেশন
+        if (!userId || !ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid User ID is required'
+            });
+        }
 
-                // ২. নির্দিষ্ট ইউজারের বুকিং ডাটা ফেচ করা
-                const userBookings = await bookingsCollection
-                    .find({ userId: new ObjectId(userId) })
-                    .toArray();
+        // ২. নির্দিষ্ট ইউজারের বুকিং ফেচ করা (সর্বশেষ বুকিং সবার আগে)
+        const userBookings = await bookingsCollection
+            .find({ userId: new ObjectId(userId) })
+            .sort({ createdAt: -1, _id: -1 })
+            .toArray();
 
+        if (userBookings.length === 0) {
+            return res.json({ success: true, bookings: [] });
+        }
 
-                if (userBookings.length === 0) {
-                    return res.json({ success: true, bookings: [] });
-                }
+        // ৩. বুকিং ডাটা থেকে সব projectId এক্সট্র্যাক্ট করা (ইনভ্যালিড আইডি ফিল্টারসহ)
+        const projectIds = userBookings
+            .filter(b => b.projectId && ObjectId.isValid(b.projectId))
+            .map(b => new ObjectId(b.projectId));
 
+        // ৪. projectsCollection থেকে প্রজেক্টের ডাটা আনা
+        const projects = await projectsCollection
+            .find({ _id: { $in: projectIds } })
+            .toArray();
 
-                // ৩. বুকিং ডাটা থেকে সব projectId এক্সট্র্যাক্ট করা (ইনভ্যালিড আইডি এড়ানোর জন্য সেফটি ফিল্টার সহ)
-                const projectIds = userBookings
-                    .filter(b => b.projectId && ObjectId.isValid(b.projectId))
-                    .map(b => new ObjectId(b.projectId));
+        // ৫. প্রজেক্ট ডাটা এবং পেমেন্ট ক্যালকুলেশন সিঙ্ক করে রেসপন্স অবজেক্ট তৈরি
+        const fullBookingsData = userBookings.map(booking => {
+            const project = projects.find(
+                p => p._id.toString() === booking.projectId?.toString()
+            );
 
-                // ৪. projectsCollection থেকে সংশ্লিষ্ট সব প্রজেক্ট ডাটা একবারে আনা
-                const projects = await projectsCollection
-                    .find({ _id: { $in: projectIds } })
-                    .toArray();
+            // পেমেন্ট ফিল্ডগুলোর সেফটি হ্যান্ডলিং
+            const totalAmount = Number(booking.totalAmount) || 0;
+            const totalPaid = Number(booking.totalPaid) || 0;
+            const totalDue = Number(booking.totalDue) ?? Math.max(0, totalAmount - totalPaid);
 
-                // ৫. প্রতিটি বুকিং অবজেক্টের ভেতর `projectDetails` ফিল্ডে ওই প্রজেক্টের ডাটা বসিয়ে দেওয়া
-                const fullBookingsData = userBookings.map(booking => {
-                    const project = projects.find(
-                        p => p._id.toString() === booking.projectId?.toString()
-                    );
-
-                    return {
-                        ...booking,
-                        projectDetails: project || null // প্রজেক্ট পাওয়া না গেলে null বসবে
-                    };
-                });
-
-                // ৬. প্রজেক্টের ডাটা সহ সম্পূর্ণ বুকিং অ্যারে ফ্রন্টএন্ডে রেসপন্স পাঠানো
-                res.json({ success: true, bookings: fullBookingsData });
-
-            } catch (error) {
-                console.error('Error fetching bookings:', error);
-                res.status(500).json({ success: false, message: error.message });
-            }
+            return {
+                ...booking,
+                totalAmount,
+                totalPaid,
+                totalDue,
+                projectDetails: project || null
+            };
         });
+
+        // ৬. সম্পূর্ণ বুকিং ডাটা রিটার্ন
+        res.json({ success: true, bookings: fullBookingsData });
+
+    } catch (error) {
+        console.error('Error fetching user bookings:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
         // ২. ইউজার নতুন পেমেন্ট দিলে 'bookingsCollection'-এ Push করার API
         // app.post('/api/submit-payment', async (req, res) => {
