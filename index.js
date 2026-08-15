@@ -780,59 +780,90 @@ app.get('/api/my-bookings', async (req, res) => {
 
 
 
-        app.post('/api/submit-payment', async (req, res) => {
-            try {
-                const { bookingId, userId, amount, paymentMethod, bankName, transactionId } = req.body;
-                // ১. প্রয়োজনীয় ফিল্ড চেক
-                if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
-                    return res.status(400).json({ success: false, message: 'All required fields are needed.' });
-                }
+    app.post('/api/submit-payment', async (req, res) => {
+    try {
+        const { bookingId, userId, amount, paymentMethod, bankName, transactionId } = req.body;
 
-                // ২. ID গুলো ভ্যালিড MongoDB ObjectId কি না চেক
-                if (!ObjectId.isValid(bookingId) || !ObjectId.isValid(userId)) {
-                    console.log("Invalid ObjectId passed:", { bookingId, userId });
-                    return res.status(400).json({ success: false, message: 'Invalid bookingId or userId format.' });
-                }
+        // ১. প্রয়োজনীয় ফিল্ড চেক
+        if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'All required fields (bookingId, userId, amount, paymentMethod, transactionId) are needed.' 
+            });
+        }
 
-                // ৩. Transaction ID ডুপ্লিকেট চেক
-                const existingTxn = await transactionsCollection.findOne({ transactionId });
-                if (existingTxn) {
-                    return res.status(400).json({ success: false, message: 'Transaction ID already exists!' });
-                }
+        // ২. ID গুলো ভ্যালিড MongoDB ObjectId কি না চেক
+        if (!ObjectId.isValid(bookingId) || !ObjectId.isValid(userId)) {
+            console.log("Invalid ObjectId passed:", { bookingId, userId });
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Invalid bookingId or userId format.' 
+            });
+        }
 
-                // ৪. নতুন অবজেক্ট তৈরি
-                const newTransaction = {
-                    bookingId: new ObjectId(bookingId),
-                    userId: new ObjectId(userId),
-                    amount: Number(amount),
-                    paymentMethod,
-                    bankName: bankName || 'N/A',
-                    transactionId,
-                    status: 'pending',
-                    createdAt: new Date()
-                };
+        // ৩. বুকিং ডাটাবেজে উপস্থিত আছে কি না যাচাই
+        const bookingExists = await bookingsCollection.findOne({ _id: new ObjectId(bookingId) });
+        if (!bookingExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'Target booking was not found.'
+            });
+        }
 
-                // ৫. Transactions Collection এ ইনসার্ট
-                const txnResult = await transactionsCollection.insertOne(newTransaction);
+        const formattedTxnId = String(transactionId).trim();
+        const numericAmount = Number(amount);
 
-                // ৬. Bookings Collection আপডেট
-                await bookingsCollection.updateOne(
-                    { _id: new ObjectId(bookingId) },
-                    { $push: { transactions: txnResult.insertedId } }
-                );
+        if (isNaN(numericAmount) || numericAmount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment amount must be a positive number.'
+            });
+        }
 
-                res.status(201).json({
-                    success: true,
-                    message: 'Payment request submitted successfully. Pending verification.',
-                    data: { _id: txnResult.insertedId, ...newTransaction }
-                });
-
-            } catch (error) {
-                // 🔴 আসল এররটি সার্ভার টার্মিনালে দেখতে এই console.error টি দেওয়া জরুরি
-                console.error("Error in /api/submit-payment:", error);
-                res.status(500).json({ success: false, message: error.message });
-            }
+        // ৪. Transaction ID ডুপ্লিকেট চেক (Case-Insensitive)
+        const existingTxn = await transactionsCollection.findOne({ 
+            transactionId: { $regex: new RegExp(`^${formattedTxnId}$`, 'i') } 
         });
+        
+        if (existingTxn) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Transaction ID already exists!' 
+            });
+        }
+
+        // ৫. নতুন অবজেক্ট তৈরি
+        const newTransaction = {
+            bookingId: new ObjectId(bookingId),
+            userId: new ObjectId(userId),
+            amount: numericAmount,
+            paymentMethod: String(paymentMethod).trim(),
+            bankName: bankName ? String(bankName).trim() : 'N/A',
+            transactionId: formattedTxnId,
+            status: 'pending',
+            createdAt: new Date()
+        };
+
+        // ৬. Transactions Collection এ ইনসার্ট
+        const txnResult = await transactionsCollection.insertOne(newTransaction);
+
+        // ৭. Bookings Collection আপডেট (Transaction ID Reference push করা)
+        await bookingsCollection.updateOne(
+            { _id: new ObjectId(bookingId) },
+            { $push: { transactions: txnResult.insertedId } }
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Payment request submitted successfully. Pending verification.',
+            data: { _id: txnResult.insertedId, ...newTransaction }
+        });
+
+    } catch (error) {
+        console.error("Error in /api/submit-payment:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 
 
 
