@@ -400,6 +400,137 @@ app.get('/api/my-bookings', async (req, res) => {
 });
 
 
+// Master Unified API - Filtered by agentId (if provided)
+app.get('/api/dashboard-master', async (req, res) => {
+    try {
+        const { agentId } = req.query;
+
+        // ১. সাধারণ ফিল্টার অবজেক্ট
+        const filter = agentId ? { agentId: agentId } : {};
+
+        // ২. Promise.all দিয়ে ফিল্টার করা ডাটা প্যারালালে ফেচ করা
+        const [
+            projects,
+            bookings,
+            users,
+            transactions,
+            teamMembers,
+            sliders,
+            settings,
+            blogs
+        ] = await Promise.all([
+            // প্রজেক্টসমূহ
+            projectsCollection.find(filter).toArray(),
+
+            // বুকিংসহ প্রজেক্ট ডিটেইলস (agentId থাকলে প্রজেক্ট কুয়েরি ফিল্টার হবে)
+            bookingsCollection.aggregate([
+                {
+                    $lookup: {
+                        from: 'projects',
+                        localField: 'projectId',
+                        foreignField: '_id',
+                        as: 'projectDetails'
+                    }
+                },
+                { $unwind: { path: '$projectDetails', preserveNullAndEmptyArrays: true } },
+                ...(agentId ? [{ $match: { "projectDetails.agentId": agentId } }] : []),
+                { $sort: { createdAt: -1 } }
+            ]).toArray(),
+
+            // ইউজারদের তালিকা (পাসওয়ার্ড ছাড়া)
+            usersCollection.find({}, { projection: { password: 0 } }).toArray(),
+
+            // ট্রানজেকশনসমূহ (agentId অনুযায়ী ফিল্টার করা প্রজেক্ট বা বুকিংয়ের সাপেক্ষে)
+            transactionsCollection.aggregate([
+                {
+                    $lookup: {
+                        from: 'bookings',
+                        localField: 'bookingId',
+                        foreignField: '_id',
+                        as: 'booking'
+                    }
+                },
+                { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+                {
+                    $lookup: {
+                        from: 'projects',
+                        localField: 'booking.projectId',
+                        foreignField: '_id',
+                        as: 'project'
+                    }
+                },
+                { $unwind: { path: '$project', preserveNullAndEmptyArrays: true } },
+                {
+                    $lookup: {
+                        from: 'users',
+                        localField: 'userId',
+                        foreignField: '_id',
+                        as: 'user'
+                    }
+                },
+                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                ...(agentId ? [{ $match: { "project.agentId": agentId } }] : []),
+                { $sort: { createdAt: -1 } }
+            ]).toArray(),
+
+            // টিম মেম্বার
+            membersCollection.find(filter).toArray(),
+
+            // স্লাইডার
+            slidersCollection.find(filter).toArray(),
+
+            // সেটিংস
+            settingsCollection.find(filter).toArray(),
+
+            // ব্লগসমূহ
+            blogsCollection.find(filter).sort({ createdAt: -1 }).toArray()
+        ]);
+
+        // মোট এপ্রুভড আয় হিসাব
+        const totalRevenue = transactions
+            .filter(t => t.status === 'approved')
+            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+        // পেন্ডিং পেমেন্ট আলাদা ফিল্টার
+        const pendingTransactions = transactions.filter(t => t.status === 'pending');
+
+        res.status(200).json({
+            success: true,
+            filterApplied: agentId ? { agentId } : "All Data",
+            summaryStats: {
+                totalProjects: projects.length,
+                totalBookings: bookings.length,
+                totalUsers: users.length,
+                totalRevenue,
+                pendingPaymentsCount: pendingTransactions.length
+            },
+            data: {
+                projects,
+                bookings,
+                users,
+                transactions,
+                pendingTransactions,
+                teamMembers,
+                sliders,
+                settings: settings[0] || null,
+                blogs
+            }
+        });
+
+    } catch (error) {
+        console.error("Error fetching filtered master dashboard data:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Failed to load dashboard data", 
+            error: error.message 
+        });
+    }
+});
+
+
+
+
+
         // post apis here 
 
 
@@ -622,7 +753,7 @@ app.get('/api/my-bookings', async (req, res) => {
 app.post('/api/bookings', async (req, res) => {
     try {
         const bookingData = req.body;
-        const { email, applicantName, contactNo, projectId } = bookingData;
+        const { email, applicantName, contactNo, projectId ,agentId} = bookingData;
 
         // প্রয়োজনীয় ফিল্ড ভ্যালিডেশন
         if (!email) {
@@ -704,6 +835,7 @@ app.post('/api/bookings', async (req, res) => {
             projectId: ObjectId.isValid(projectId) ? new ObjectId(projectId) : projectId,
             userId: user._id,
             status: 'pending',
+            agentId:agentId,
             createdAt: new Date()
         };
 
