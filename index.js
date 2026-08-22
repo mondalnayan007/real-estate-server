@@ -1134,6 +1134,35 @@ app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
 });
 
 
+
+  app.post('/create-checkout-session', async(req,res)=>{
+    const paymentInfo = req.body;
+    const session =await stripe.checkout.sessions.create({
+
+    ui_mode: "elements",
+    line_items: [
+      {
+        // Provide the exact Price ID (for example, price_1234) of the product you want to sell
+        price_data:{
+            currency:'USD',
+            unit_amount:paymentInfo.price,
+            product_data:{
+                name:paymentInfo.planName
+            },
+
+        },
+        quantity: 1,
+      },
+    ],
+    customer_email:paymentInfo.senderEmail,
+    mode: 'payment',
+    return_url: `${process.env.SITE_DOMAIN}/payment-success`,
+  })
+  })
+
+
+
+
         // ------------------------------------------------------------------
         // 🔑 Login API: POST /api/login
         // ------------------------------------------------------------------
