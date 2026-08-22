@@ -1137,33 +1137,33 @@ app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
 
   app.post('/create-checkout-session', async(req,res)=>{
     const paymentInfo = req.body;
-    const price = parseInt(paymentInfo.price)*100;
+    const price = parseInt(paymentInfo.planDetails.price)*100;
     const session =await stripe.checkout.sessions.create({
 
-    ui_mode: "elements",
+    ui_mode: "hosted_page",
     line_items: [
       {
         price_data:{
             currency:'USD',
             unit_amount:price,
             product_data:{
-                name:paymentInfo.planName
+                name:paymentInfo.planDetails.planName
             },
 
         },
         quantity: 1,
       },
     ],
-    customer_email:paymentInfo.senderEmail,
+    customer_email:paymentInfo.customer.senderEmail,
     mode: 'payment',
     metadata:{
-        planId:paymentInfo.planId
+        planId:paymentInfo.planDetails.planId
     },
     success_url: `${process.env.SITE_DOMAIN}/payment-success`,
     cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
   })
   console.log(session);
-  console.log({url: session.url});
+  res.send({url: session.url});
   })
 
 
