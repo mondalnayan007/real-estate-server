@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const app = express()
 const nodemailer = require('nodemailer');
 const port = process.env.PORT || 3000
+const stripe = require("stripe")(process.env.STRIP_SECRET);
 const { MongoClient, ObjectId } = require('mongodb');
 const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware, upload } = require('./utils/CloudinaryConfig');
 
