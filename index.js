@@ -1159,11 +1159,13 @@ app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
     metadata:{
         planId:paymentInfo.planDetails.planId
     },
-    success_url: `${process.env.SITE_DOMAIN}/payment-success`,
+    success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
   })
   console.log(session);
+  
   res.send({url: session.url});
+  res.send( session);
   })
 
 
