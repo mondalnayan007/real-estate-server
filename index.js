@@ -1143,7 +1143,7 @@ app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
     }
 });
 
-
+// -------------------------Stripe checkout session ----------------------
 
   app.post('/create-checkout-session', async(req,res)=>{
     const paymentInfo = req.body;
@@ -1168,13 +1168,13 @@ app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
     customer_email:paymentInfo.customer.senderEmail,
     mode: 'payment',
     metadata:{
-        agentName:paymentInfo.customer.fullName,
+    agentName:paymentInfo.customer.fullName,
     agencyName:paymentInfo.customer.agencyName,
     whatsappNumber:paymentInfo.customer.whatsappNumber,
     senderEmail:paymentInfo.customer.senderEmail,
     subdomain:paymentInfo.domainConfig.customUsername,
     planName:paymentInfo.planDetails.planName,
-    planPrice:price,
+    planPrice:paymentInfo.planDetails.price,
     planDuration:paymentInfo.planDetails.duration,
     createdAt:paymentInfo.createdAt
 
