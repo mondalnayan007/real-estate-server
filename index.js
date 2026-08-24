@@ -531,6 +531,16 @@ app.get('/api/dashboard-master', async (req, res) => {
 
 
 
+app.get('/session-status', async(req,res)=>{
+    
+    const {sessionId} = req.query;
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    res.send(session.metadata)
+})
+
+
+
+
 
         // post apis here 
 
@@ -1137,7 +1147,8 @@ app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
 
   app.post('/create-checkout-session', async(req,res)=>{
     const paymentInfo = req.body;
-    const price = parseInt(paymentInfo.planDetails.price)*100;
+    const price = parseInt(paymentInfo.planDetails.price)*100
+    
     const session =await stripe.checkout.sessions.create({
 
     ui_mode: "hosted_page",
@@ -1157,7 +1168,16 @@ app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
     customer_email:paymentInfo.customer.senderEmail,
     mode: 'payment',
     metadata:{
-        planId:paymentInfo.planDetails.planId
+        agentName:paymentInfo.customer.fullName,
+    agencyName:paymentInfo.customer.agencyName,
+    whatsappNumber:paymentInfo.customer.whatsappNumber,
+    senderEmail:paymentInfo.customer.senderEmail,
+    subdomain:paymentInfo.domainConfig.customUsername,
+    planName:paymentInfo.planDetails.planName,
+    planPrice:price,
+    planDuration:paymentInfo.planDetails.duration,
+    createdAt:paymentInfo.createdAt
+
     },
     success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
