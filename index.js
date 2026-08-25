@@ -14,6 +14,25 @@ const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware, up
 app.use(cors());
 app.use(express.json());
 
+
+        // ------------------token verification------------------
+
+// const verifyToken = async (req, res, next) => {
+//   const authHeader = req.headers.authorization;
+//   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+//     return res.status(401).send({ error: true, message: 'Unauthorized access! No token provided.' });
+//   }
+
+//   const token = authHeader.split(' ')[1];
+//   try {
+//     const decodedToken = await admin.auth().verifyIdToken(token);
+//     req.user = decodedToken;
+//     next();
+//   } catch (error) {
+//     return res.status(403).send({ error: true, message: 'Invalid or expired token.' });
+//   }
+// };
+
 // ১. নোডমেইলার ট্রান্সপোর্টার তৈরি (গুগল অ্যাপ পাসওয়ার্ড দিয়ে)
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -670,94 +689,97 @@ app.get('/session-status', async(req,res)=>{
 
 
         // add agent data 
+app.post('/api/agents/register', upload.single('image'), async (req, res) => {
+    try {
+        // ১. ফ্রন্টএন্ড এবং Auth Token থেকে ডাটা সংগ্রহ
+        const {
+            name,
+            firstName,
+            lastName,
+            email,
+            uid,
+            agentId,
+            authProvider
+        } = req.body;
 
-        app.post('/api/agents/register', upload.single('avatar'), async (req, res) => {
-            try {
-                // ১. টেক্সট ডাটা আলাদা করা
-                const {
-                    agentId,
-                    firstName,
-                    lastName,
-                    email,
-                    authProvider,
-                    agencyName,
-                    whatsappNumber,
-                    domainType,
-                    targetDomain,
-                    subdomain,
-                    customDomain,
-                    paymentStatus
-                } = req.body;
+        const finalAgentId = uid || agentId || req.user?.uid;
+        const finalEmail = email || req.user?.email;
 
-                // ২. ডুপ্লিকেট এজেন্ট বা ডোমেন চেক (Pure MongoDB ড্রাইভার দিয়ে)
-                const existingAgent = await agentsCollection.findOne({
-                    $or: [
-                        { agentId: agentId },
-                        { email: email },
-                        { targetDomain: targetDomain }
-                    ]
-                });
+        if (!finalEmail || !finalAgentId) {
+            return res.status(400).send({ 
+                error: true, 
+                message: "User Email and ID are required!" 
+            });
+        }
 
-                if (existingAgent) {
-                    return res.status(400).send({ error: true, message: "This Agent, Email, or Domain is already registered!" });
-                }
-
-                // ৩. আপনার আগের প্রজেক্টের মতোই ক্লাউডিনারিতে আপলোড ও URL আনা
-                let finalAvatarUrl = "";
-
-                if (req.file) {
-                    // আপনার প্রোজেক্টে যেমন 'uploadToCloudinary' তে req.files পাস করেছিলেন, 
-                    // এখানে যেহেতু সিঙ্গেল ফাইল (avatar), তাই সরাসরি req.file নিয়ে বাফার করে আপলোড করব:
-                    const b64 = Buffer.from(req.file.buffer).toString("base64");
-                    let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-
-                    const uploadResponse = await cloudinary.uploader.upload(dataURI, {
-                        folder: "agent_profiles",
-                    });
-                    finalAvatarUrl = uploadResponse.secure_url;
-                } else if (req.body.avatar) {
-                    // যদি গুগল সাইন-আপ হয়, তবে ফ্রন্টএন্ড থেকে গুগলের প্রোফাইল ইমেজের ডিরেক্ট URL আসবে
-                    finalAvatarUrl = req.body.avatar;
-                } else {
-                    // কোনো ইমেজ না থাকলে ডিফল্ট প্লেসহোল্ডার ইমেজ
-                    finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
-                }
-
-                // ৪. ফাইনাল ডাটা অবজেক্ট তৈরি
-                const finalAgentData = {
-                    agentId,
-                    firstName,
-                    lastName,
-                    email,
-                    avatar: finalAvatarUrl,
-                    authProvider,
-                    agencyName,
-                    whatsappNumber,
-                    domainType,
-                    targetDomain,
-                    subdomain: subdomain || null,
-                    customDomain: customDomain || null,
-                    paymentStatus: paymentStatus || 'pending',
-                    createdAt: new Date()
-                };
-
-                // ৫. ডাটাবেজে ইনসার্ট (insertOne)
-                const result = await agentsCollection.insertOne(finalAgentData);
-
-                // ৬. ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ সেভড অবজেক্ট পাঠানো
-                const savedAgent = {
-                    _id: result.insertedId,
-                    ...finalAgentData
-                };
-
-                res.status(201).send(savedAgent);
-
-            } catch (error) {
-                console.error("Error in agent registration API:", error);
-                res.status(500).send({ error: true, message: "Internal Server Error" });
-            }
+        // ২. ডুপ্লিকেট ইউজার চেক
+        const existingAgent = await agentsCollection.findOne({
+            $or: [
+                { agentId: finalAgentId },
+                { email: finalEmail }
+            ]
         });
 
+        if (existingAgent) {
+            return res.status(400).send({ 
+                error: true, 
+                message: "This Email or Account is already registered!" 
+            });
+        }
+
+        // ৩. ইমেজের জন্য Cloudinary / External / Default Avatar সেটআপ
+        let finalAvatarUrl = "";
+
+        if (req.file) {
+            // আপনার Cloudinary Helper function ব্যবহার করা হয়েছে (req.file-কে Array আকারে পাঠাতে হবে)
+            const uploadedUrls = await uploadToCloudinary([req.file]);
+            finalAvatarUrl = uploadedUrls[0] || "";
+        } else if (req.body.image || req.body.avatar || req.user?.picture) {
+            // Google Sign-In বা external image URL
+            finalAvatarUrl = req.body.image || req.body.avatar || req.user.picture;
+        } else {
+            // Default placeholder image
+            finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
+        }
+
+        // ৪. নাম প্রসেসিং
+        const fullName = name || `${firstName || ''} ${lastName || ''}`.trim();
+
+        // ৫. ফাইনাল Agent Object তৈরি
+        const finalAgentData = {
+            agentId: finalAgentId,
+            name: fullName,
+            firstName: firstName || fullName.split(' ')[0] || "",
+            lastName: lastName || fullName.split(' ').slice(1).join(' ') || "",
+            email: finalEmail,
+            avatar: finalAvatarUrl,
+            authProvider: authProvider || (req.user?.firebase?.sign_in_provider === 'google.com' ? 'google' : 'email'),
+            paymentStatus: 'pending',
+            createdAt: new Date()
+        };
+
+        // ৬. ডাটাবেজে ইনসার্ট
+        const result = await agentsCollection.insertOne(finalAgentData);
+
+        const savedAgent = {
+            _id: result.insertedId,
+            ...finalAgentData
+        };
+
+        return res.status(201).send({
+            success: true,
+            message: "Registration successful!",
+            data: savedAgent
+        });
+
+    } catch (error) {
+        console.error("Error in agent registration API:", error);
+        return res.status(500).send({ 
+            error: true, 
+            message: "Internal Server Error" 
+        });
+    }
+});
 
 
 // 🚀 POST: /api/bookings
