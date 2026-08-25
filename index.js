@@ -693,16 +693,18 @@ app.post('/api/agents/register', upload.single('image'), async (req, res) => {
     try {
         // ১. ফ্রন্টএন্ড এবং Auth Token থেকে ডাটা সংগ্রহ
         const {
-            name,
+            
             firstName,
             lastName,
             email,
             uid,
-            agentId,
+            avatar,
+            
             authProvider
         } = req.body;
+        console.log(req.body);
 
-        const finalAgentId = uid || agentId || req.user?.uid;
+        const finalAgentId = uid  || req.user?.uid;
         const finalEmail = email || req.user?.email;
 
         if (!finalEmail || !finalAgentId) {
