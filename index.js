@@ -15,7 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 
-        // ------------------token verification------------------
+// ------------------token verification------------------
 
 // const verifyToken = async (req, res, next) => {
 //   const authHeader = req.headers.authorization;
@@ -149,66 +149,66 @@ async function connectToMongoDB() {
 
 
 
-app.get('/api/my-bookings', async (req, res) => {
-    try {
-        const { userId } = req.query;
+        app.get('/api/my-bookings', async (req, res) => {
+            try {
+                const { userId } = req.query;
 
-        // ১. userId ভ্যালিডেশন
-        if (!userId || !ObjectId.isValid(userId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Valid User ID is required'
-            });
-        }
+                // ১. userId ভ্যালিডেশন
+                if (!userId || !ObjectId.isValid(userId)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Valid User ID is required'
+                    });
+                }
 
-        // ২. নির্দিষ্ট ইউজারের বুকিং ফেচ করা (সর্বশেষ বুকিং সবার আগে)
-        const userBookings = await bookingsCollection
-            .find({ userId: new ObjectId(userId) })
-            .sort({ createdAt: -1, _id: -1 })
-            .toArray();
+                // ২. নির্দিষ্ট ইউজারের বুকিং ফেচ করা (সর্বশেষ বুকিং সবার আগে)
+                const userBookings = await bookingsCollection
+                    .find({ userId: new ObjectId(userId) })
+                    .sort({ createdAt: -1, _id: -1 })
+                    .toArray();
 
-        if (userBookings.length === 0) {
-            return res.json({ success: true, bookings: [] });
-        }
+                if (userBookings.length === 0) {
+                    return res.json({ success: true, bookings: [] });
+                }
 
-        // ৩. বুকিং ডাটা থেকে সব projectId এক্সট্র্যাক্ট করা (ইনভ্যালিড আইডি ফিল্টারসহ)
-        const projectIds = userBookings
-            .filter(b => b.projectId && ObjectId.isValid(b.projectId))
-            .map(b => new ObjectId(b.projectId));
+                // ৩. বুকিং ডাটা থেকে সব projectId এক্সট্র্যাক্ট করা (ইনভ্যালিড আইডি ফিল্টারসহ)
+                const projectIds = userBookings
+                    .filter(b => b.projectId && ObjectId.isValid(b.projectId))
+                    .map(b => new ObjectId(b.projectId));
 
-        // ৪. projectsCollection থেকে প্রজেক্টের ডাটা আনা
-        const projects = await projectsCollection
-            .find({ _id: { $in: projectIds } })
-            .toArray();
+                // ৪. projectsCollection থেকে প্রজেক্টের ডাটা আনা
+                const projects = await projectsCollection
+                    .find({ _id: { $in: projectIds } })
+                    .toArray();
 
-        // ৫. প্রজেক্ট ডাটা এবং পেমেন্ট ক্যালকুলেশন সিঙ্ক করে রেসপন্স অবজেক্ট তৈরি
-        const fullBookingsData = userBookings.map(booking => {
-            const project = projects.find(
-                p => p._id.toString() === booking.projectId?.toString()
-            );
+                // ৫. প্রজেক্ট ডাটা এবং পেমেন্ট ক্যালকুলেশন সিঙ্ক করে রেসপন্স অবজেক্ট তৈরি
+                const fullBookingsData = userBookings.map(booking => {
+                    const project = projects.find(
+                        p => p._id.toString() === booking.projectId?.toString()
+                    );
 
-            // পেমেন্ট ফিল্ডগুলোর সেফটি হ্যান্ডলিং
-            const totalAmount = Number(booking.totalAmount) || 0;
-            const totalPaid = Number(booking.totalPaid) || 0;
-            const totalDue = Number(booking.totalDue) ?? Math.max(0, totalAmount - totalPaid);
+                    // পেমেন্ট ফিল্ডগুলোর সেফটি হ্যান্ডলিং
+                    const totalAmount = Number(booking.totalAmount) || 0;
+                    const totalPaid = Number(booking.totalPaid) || 0;
+                    const totalDue = Number(booking.totalDue) ?? Math.max(0, totalAmount - totalPaid);
 
-            return {
-                ...booking,
-                totalAmount,
-                totalPaid,
-                totalDue,
-                projectDetails: project || null
-            };
+                    return {
+                        ...booking,
+                        totalAmount,
+                        totalPaid,
+                        totalDue,
+                        projectDetails: project || null
+                    };
+                });
+
+                // ৬. সম্পূর্ণ বুকিং ডাটা রিটার্ন
+                res.json({ success: true, bookings: fullBookingsData });
+
+            } catch (error) {
+                console.error('Error fetching user bookings:', error);
+                res.status(500).json({ success: false, message: error.message });
+            }
         });
-
-        // ৬. সম্পূর্ণ বুকিং ডাটা রিটার্ন
-        res.json({ success: true, bookings: fullBookingsData });
-
-    } catch (error) {
-        console.error('Error fetching user bookings:', error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
 
         // ২. ইউজার নতুন পেমেন্ট দিলে 'bookingsCollection'-এ Push করার API
         // app.post('/api/submit-payment', async (req, res) => {
@@ -280,39 +280,39 @@ app.get('/api/my-bookings', async (req, res) => {
             }
         });
 
-     app.get('/admin/transactions', async (req, res) => {
-    try {
-        const { bookingId } = req.query;
+        app.get('/admin/transactions', async (req, res) => {
+            try {
+                const { bookingId } = req.query;
 
-        // ১. bookingId চেক এবং ObjectId ভ্যালিডেশন
-        if (!bookingId || !ObjectId.isValid(bookingId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Valid Booking ID is required'
-            });
-        }
+                // ১. bookingId চেক এবং ObjectId ভ্যালিডেশন
+                if (!bookingId || !ObjectId.isValid(bookingId)) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Valid Booking ID is required'
+                    });
+                }
 
-        // ২. ট্রানজ্যাকশন খোঁজা এবং সর্বশেষ পেমেন্ট আগে সাজানো (Descending Order)
-        const query = { bookingId: new ObjectId(bookingId) };
-        const transactions = await transactionsCollection
-            .find(query)
-            .sort({ createdAt: -1, _id: -1 })
-            .toArray();
+                // ২. ট্রানজ্যাকশন খোঁজা এবং সর্বশেষ পেমেন্ট আগে সাজানো (Descending Order)
+                const query = { bookingId: new ObjectId(bookingId) };
+                const transactions = await transactionsCollection
+                    .find(query)
+                    .sort({ createdAt: -1, _id: -1 })
+                    .toArray();
 
-        // ৩. স্ট্যান্ডার্ড রেসপন্স ব্যাক করা
-        res.json({
-            success: true,
-            transactions
+                // ৩. স্ট্যান্ডার্ড রেসপন্স ব্যাক করা
+                res.json({
+                    success: true,
+                    transactions
+                });
+
+            } catch (error) {
+                console.error('Error fetching transactions:', error);
+                res.status(500).json({
+                    success: false,
+                    message: 'Server error while fetching transactions'
+                });
+            }
         });
-
-    } catch (error) {
-        console.error('Error fetching transactions:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while fetching transactions'
-        });
-    }
-});
 
 
         // blog collection find api 
@@ -358,204 +358,204 @@ app.get('/api/my-bookings', async (req, res) => {
         // ==========================================
         // ২. এডমিন প্যানেল: অল ট্রানজ্যাকশন লিস্ট পাওয়ার API (Pending, Approved & Rejected)
         // ==========================================
-  app.get('/api/admin/pending-payments', async (req, res) => {
-    try {
-        // Aggregate দিয়ে User এবং Booking-এর সাথে JOIN করা
-        const allTxns = await transactionsCollection.aggregate([
-            { $sort: { createdAt: -1, _id: -1 } }, // নতুন ট্রানজ্যাকশন সবার উপরে
-            {
-                $lookup: {
-                    from: 'users',
-                    localField: 'userId',
-                    foreignField: '_id',
-                    as: 'user'
-                }
-            },
-            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-            {
-                $lookup: {
-                    from: 'bookings',
-                    localField: 'bookingId',
-                    foreignField: '_id',
-                    as: 'booking'
-                }
-            },
-            { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
-            {
-                $project: {
-                    _id: 1,
-                    bookingId: 1,
-                    userId: 1,
-                    amount: 1,
-                    paymentType:1,
-                    senderName:1,
-                    paymentMethod: 1,
-                    bankName: 1,
-                    transactionId: 1,
-                    status: 1, // 'approved', 'rejected', or 'pending'
-                    createdAt: 1,
-                    'user._id': 1,
-                    'user.name': 1,
-                    'user.email': 1,
-                    'user.phone': 1,
-                    'booking._id': 1,
-                    'booking.projectName': 1,
-                    'booking.totalAmount': 1,
-                    'booking.totalPaid': 1,
-                    'booking.totalDue': 1
-                }
-            }
-        ]).toArray();
-
-        res.status(200).json({
-            success: true,
-            count: allTxns.length,
-            data: allTxns
-        });
-
-    } catch (error) {
-        console.error("Error fetching transactions:", error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-
-// Master Unified API - Filtered by agentId (if provided)
-app.get('/api/dashboard-master', async (req, res) => {
-    try {
-        const { agentId } = req.query;
-
-        // ১. সাধারণ ফিল্টার অবজেক্ট
-        const filter = agentId ? { agentId: agentId } : {};
-
-        // ২. Promise.all দিয়ে ফিল্টার করা ডাটা প্যারালালে ফেচ করা
-        const [
-            projects,
-            bookings,
-            users,
-            transactions,
-            teamMembers,
-            sliders,
-            settings,
-            blogs
-        ] = await Promise.all([
-            // প্রজেক্টসমূহ
-            projectsCollection.find(filter).toArray(),
-
-            // বুকিংসহ প্রজেক্ট ডিটেইলস (agentId থাকলে প্রজেক্ট কুয়েরি ফিল্টার হবে)
-            bookingsCollection.aggregate([
-                {
-                    $lookup: {
-                        from: 'projects',
-                        localField: 'projectId',
-                        foreignField: '_id',
-                        as: 'projectDetails'
+        app.get('/api/admin/pending-payments', async (req, res) => {
+            try {
+                // Aggregate দিয়ে User এবং Booking-এর সাথে JOIN করা
+                const allTxns = await transactionsCollection.aggregate([
+                    { $sort: { createdAt: -1, _id: -1 } }, // নতুন ট্রানজ্যাকশন সবার উপরে
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'userId',
+                            foreignField: '_id',
+                            as: 'user'
+                        }
+                    },
+                    { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'bookings',
+                            localField: 'bookingId',
+                            foreignField: '_id',
+                            as: 'booking'
+                        }
+                    },
+                    { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+                    {
+                        $project: {
+                            _id: 1,
+                            bookingId: 1,
+                            userId: 1,
+                            amount: 1,
+                            paymentType: 1,
+                            senderName: 1,
+                            paymentMethod: 1,
+                            bankName: 1,
+                            transactionId: 1,
+                            status: 1, // 'approved', 'rejected', or 'pending'
+                            createdAt: 1,
+                            'user._id': 1,
+                            'user.name': 1,
+                            'user.email': 1,
+                            'user.phone': 1,
+                            'booking._id': 1,
+                            'booking.projectName': 1,
+                            'booking.totalAmount': 1,
+                            'booking.totalPaid': 1,
+                            'booking.totalDue': 1
+                        }
                     }
-                },
-                { $unwind: { path: '$projectDetails', preserveNullAndEmptyArrays: true } },
-                ...(agentId ? [{ $match: { "projectDetails.agentId": agentId } }] : []),
-                { $sort: { createdAt: -1 } }
-            ]).toArray(),
+                ]).toArray();
 
-            // ইউজারদের তালিকা (পাসওয়ার্ড ছাড়া)
-            usersCollection.find({}, { projection: { password: 0 } }).toArray(),
+                res.status(200).json({
+                    success: true,
+                    count: allTxns.length,
+                    data: allTxns
+                });
 
-            // ট্রানজেকশনসমূহ (agentId অনুযায়ী ফিল্টার করা প্রজেক্ট বা বুকিংয়ের সাপেক্ষে)
-            transactionsCollection.aggregate([
-                {
-                    $lookup: {
-                        from: 'bookings',
-                        localField: 'bookingId',
-                        foreignField: '_id',
-                        as: 'booking'
-                    }
-                },
-                { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
-                {
-                    $lookup: {
-                        from: 'projects',
-                        localField: 'booking.projectId',
-                        foreignField: '_id',
-                        as: 'project'
-                    }
-                },
-                { $unwind: { path: '$project', preserveNullAndEmptyArrays: true } },
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'userId',
-                        foreignField: '_id',
-                        as: 'user'
-                    }
-                },
-                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-                ...(agentId ? [{ $match: { "project.agentId": agentId } }] : []),
-                { $sort: { createdAt: -1 } }
-            ]).toArray(),
-
-            // টিম মেম্বার
-            membersCollection.find(filter).toArray(),
-
-            // স্লাইডার
-            slidersCollection.find(filter).toArray(),
-
-            // সেটিংস
-            settingsCollection.find(filter).toArray(),
-
-            // ব্লগসমূহ
-            blogsCollection.find(filter).sort({ createdAt: -1 }).toArray()
-        ]);
-
-        // মোট এপ্রুভড আয় হিসাব
-        const totalRevenue = transactions
-            .filter(t => t.status === 'approved')
-            .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-        // পেন্ডিং পেমেন্ট আলাদা ফিল্টার
-        const pendingTransactions = transactions.filter(t => t.status === 'pending');
-
-        res.status(200).json({
-            success: true,
-            filterApplied: agentId ? { agentId } : "All Data",
-            summaryStats: {
-                totalProjects: projects.length,
-                totalBookings: bookings.length,
-                totalUsers: users.length,
-                totalRevenue,
-                pendingPaymentsCount: pendingTransactions.length
-            },
-            data: {
-                projects,
-                bookings,
-                users,
-                transactions,
-                pendingTransactions,
-                teamMembers,
-                sliders,
-                settings: settings[0] || null,
-                blogs
+            } catch (error) {
+                console.error("Error fetching transactions:", error);
+                res.status(500).json({ success: false, message: error.message });
             }
         });
 
-    } catch (error) {
-        console.error("Error fetching filtered master dashboard data:", error);
-        res.status(500).json({ 
-            success: false, 
-            message: "Failed to load dashboard data", 
-            error: error.message 
+
+        // Master Unified API - Filtered by agentId (if provided)
+        app.get('/api/dashboard-master', async (req, res) => {
+            try {
+                const { agentId } = req.query;
+
+                // ১. সাধারণ ফিল্টার অবজেক্ট
+                const filter = agentId ? { agentId: agentId } : {};
+
+                // ২. Promise.all দিয়ে ফিল্টার করা ডাটা প্যারালালে ফেচ করা
+                const [
+                    projects,
+                    bookings,
+                    users,
+                    transactions,
+                    teamMembers,
+                    sliders,
+                    settings,
+                    blogs
+                ] = await Promise.all([
+                    // প্রজেক্টসমূহ
+                    projectsCollection.find(filter).toArray(),
+
+                    // বুকিংসহ প্রজেক্ট ডিটেইলস (agentId থাকলে প্রজেক্ট কুয়েরি ফিল্টার হবে)
+                    bookingsCollection.aggregate([
+                        {
+                            $lookup: {
+                                from: 'projects',
+                                localField: 'projectId',
+                                foreignField: '_id',
+                                as: 'projectDetails'
+                            }
+                        },
+                        { $unwind: { path: '$projectDetails', preserveNullAndEmptyArrays: true } },
+                        ...(agentId ? [{ $match: { "projectDetails.agentId": agentId } }] : []),
+                        { $sort: { createdAt: -1 } }
+                    ]).toArray(),
+
+                    // ইউজারদের তালিকা (পাসওয়ার্ড ছাড়া)
+                    usersCollection.find({}, { projection: { password: 0 } }).toArray(),
+
+                    // ট্রানজেকশনসমূহ (agentId অনুযায়ী ফিল্টার করা প্রজেক্ট বা বুকিংয়ের সাপেক্ষে)
+                    transactionsCollection.aggregate([
+                        {
+                            $lookup: {
+                                from: 'bookings',
+                                localField: 'bookingId',
+                                foreignField: '_id',
+                                as: 'booking'
+                            }
+                        },
+                        { $unwind: { path: '$booking', preserveNullAndEmptyArrays: true } },
+                        {
+                            $lookup: {
+                                from: 'projects',
+                                localField: 'booking.projectId',
+                                foreignField: '_id',
+                                as: 'project'
+                            }
+                        },
+                        { $unwind: { path: '$project', preserveNullAndEmptyArrays: true } },
+                        {
+                            $lookup: {
+                                from: 'users',
+                                localField: 'userId',
+                                foreignField: '_id',
+                                as: 'user'
+                            }
+                        },
+                        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                        ...(agentId ? [{ $match: { "project.agentId": agentId } }] : []),
+                        { $sort: { createdAt: -1 } }
+                    ]).toArray(),
+
+                    // টিম মেম্বার
+                    membersCollection.find(filter).toArray(),
+
+                    // স্লাইডার
+                    slidersCollection.find(filter).toArray(),
+
+                    // সেটিংস
+                    settingsCollection.find(filter).toArray(),
+
+                    // ব্লগসমূহ
+                    blogsCollection.find(filter).sort({ createdAt: -1 }).toArray()
+                ]);
+
+                // মোট এপ্রুভড আয় হিসাব
+                const totalRevenue = transactions
+                    .filter(t => t.status === 'approved')
+                    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+                // পেন্ডিং পেমেন্ট আলাদা ফিল্টার
+                const pendingTransactions = transactions.filter(t => t.status === 'pending');
+
+                res.status(200).json({
+                    success: true,
+                    filterApplied: agentId ? { agentId } : "All Data",
+                    summaryStats: {
+                        totalProjects: projects.length,
+                        totalBookings: bookings.length,
+                        totalUsers: users.length,
+                        totalRevenue,
+                        pendingPaymentsCount: pendingTransactions.length
+                    },
+                    data: {
+                        projects,
+                        bookings,
+                        users,
+                        transactions,
+                        pendingTransactions,
+                        teamMembers,
+                        sliders,
+                        settings: settings[0] || null,
+                        blogs
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error fetching filtered master dashboard data:", error);
+                res.status(500).json({
+                    success: false,
+                    message: "Failed to load dashboard data",
+                    error: error.message
+                });
+            }
         });
-    }
-});
 
 
 
 
-app.get('/session-status', async(req,res)=>{
-    
-    const {sessionId} = req.query;
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-    res.send(session.metadata)
-})
+        app.get('/session-status', async (req, res) => {
+
+            const { sessionId } = req.query;
+            const session = await stripe.checkout.sessions.retrieve(sessionId);
+            res.send(session.metadata)
+        })
 
 
 
@@ -689,147 +689,146 @@ app.get('/session-status', async(req,res)=>{
 
 
         // add agent data 
-app.post('/api/agents/register', upload.single('image'), async (req, res) => {
-    try {
-        // ১. ফ্রন্টএন্ড এবং Auth Token থেকে ডাটা সংগ্রহ
-        const {
-            
-            firstName,
-            lastName,
-            email,
-            uid,
-            avatar,
-            
-            authProvider
-        } = req.body;
-        console.log(req.body);
-
-        const finalAgentId = uid  || req.user?.uid;
-        const finalEmail = email || req.user?.email;
-
-        if (!finalEmail || !finalAgentId) {
-            return res.status(400).send({ 
-                error: true, 
-                message: "User Email and ID are required!" 
-            });
-        }
-
-        // ২. ডুপ্লিকেট ইউজার চেক
-        const existingAgent = await agentsCollection.findOne({
-            $or: [
-                { agentId: finalAgentId },
-                { email: finalEmail }
-            ]
-        });
-
-        if (existingAgent) {
-            return res.status(400).send({ 
-                error: true, 
-                message: "This Email or Account is already registered!" 
-            });
-        }
-
-        // ৩. ইমেজের জন্য Cloudinary / External / Default Avatar সেটআপ
-        let finalAvatarUrl = "";
-
-        if (req.file) {
-            // আপনার Cloudinary Helper function ব্যবহার করা হয়েছে (req.file-কে Array আকারে পাঠাতে হবে)
-            const uploadedUrls = await uploadToCloudinary([req.file]);
-            finalAvatarUrl = uploadedUrls[0] || "";
-        } else if (req.body.image || req.body.avatar || req.user?.picture) {
-            // Google Sign-In বা external image URL
-            finalAvatarUrl = req.body.image || req.body.avatar || req.user.picture;
-        } else {
-            // Default placeholder image
-            finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
-        }
-
-        // ৪. নাম প্রসেসিং
-        const fullName = name || `${firstName || ''} ${lastName || ''}`.trim();
-
-        // ৫. ফাইনাল Agent Object তৈরি
-        const finalAgentData = {
-            agentId: finalAgentId,
-            name: fullName,
-            firstName: firstName || fullName.split(' ')[0] || "",
-            lastName: lastName || fullName.split(' ').slice(1).join(' ') || "",
-            email: finalEmail,
-            avatar: finalAvatarUrl,
-            authProvider: authProvider || (req.user?.firebase?.sign_in_provider === 'google.com' ? 'google' : 'email'),
-            paymentStatus: 'pending',
-            createdAt: new Date()
-        };
-
-        // ৬. ডাটাবেজে ইনসার্ট
-        const result = await agentsCollection.insertOne(finalAgentData);
-
-        const savedAgent = {
-            _id: result.insertedId,
-            ...finalAgentData
-        };
-
-        return res.status(201).send({
-            success: true,
-            message: "Registration successful!",
-            data: savedAgent
-        });
-
-    } catch (error) {
-        console.error("Error in agent registration API:", error);
-        return res.status(500).send({ 
-            error: true, 
-            message: "Internal Server Error" 
-        });
-    }
-});
-
-
-// 🚀 POST: /api/bookings
-app.post('/api/bookings', async (req, res) => {
-    try {
-        const bookingData = req.body;
-        const { email, applicantName, contactNo, projectId ,agentId} = bookingData;
-
-        // প্রয়োজনীয় ফিল্ড ভ্যালিডেশন
-        if (!email) {
-            return res.status(400).json({ success: false, message: "Email is required!" });
-        }
-
-        if (!projectId) {
-            return res.status(400).json({ success: false, message: "Project ID is required!" });
-        }
-
-        const normalizedEmail = email.toLowerCase().trim();
-
-        // ১. চেক করা ইউজার আগে থেকে আছে কি না
-        let user = await usersCollection.findOne({ email: normalizedEmail });
-        let autoGeneratedPassword = null;
-
-        if (!user) {
-            // ইউজার না থাকলে নতুন পাসওয়ার্ড জেনারেট করা
-            autoGeneratedPassword = 'pass_' + Math.random().toString(36).slice(-5);
-            const hashedPassword = await bcrypt.hash(autoGeneratedPassword, 10);
-
-            const newUser = {
-                name: applicantName,
-                email: normalizedEmail,
-                phone: contactNo,
-                password: hashedPassword,
-                role: 'client',
-                createdAt: new Date()
-            };
-
-            // 'users' কালেকশনে অটো ক্রিয়েট ও ইনসার্ট
-            const userResult = await usersCollection.insertOne(newUser);
-            user = { _id: userResult.insertedId, ...newUser };
-
-            // নতুন ইউজারকে পাসওয়ার্ড ইমেইল করা
+        app.post('/api/agents/register', upload.single('image'), async (req, res) => {
             try {
-                await transporter.sendMail({
-                    from: '"Property Management" <noreply@yourdomain.com>',
-                    to: normalizedEmail,
-                    subject: 'Your Account Credentials for Property Portal',
-                    html: `
+                // ১. ফ্রন্টএন্ড এবং Auth Token থেকে ডাটা সংগ্রহ
+                const {
+
+                    firstName,
+                    lastName,
+                    email,
+                    uid,
+                    avatar,
+
+                    authProvider
+                } = req.body;
+                console.log(req.body);
+
+                const finalAgentId = uid || req.user?.uid;
+                const finalEmail = email || req.user?.email;
+
+                if (!finalEmail || !finalAgentId) {
+                    return res.status(400).send({
+                        error: true,
+                        message: "User Email and ID are required!"
+                    });
+                }
+
+                // ২. ডুপ্লিকেট ইউজার চেক
+                const existingAgent = await agentsCollection.findOne({
+                    $or: [
+
+                        { email: finalEmail }
+                    ]
+                });
+
+                if (existingAgent) {
+                    return res.status(400).send({
+                        error: true,
+                        message: "This Email or Account is already registered!"
+                    });
+                }
+
+                // ৩. ইমেজের জন্য Cloudinary / External / Default Avatar সেটআপ
+                let finalAvatarUrl = "";
+
+                if (req.file && req.file.path) {
+                    const uploadedUrls = await uploadToCloudinary([req.file]);
+                    finalAvatarUrl = uploadedUrls[0] || "";
+                } else if (req.body.image || req.body.avatar || req.user?.picture) {
+                    // Google Sign-In বা external image URL
+                    finalAvatarUrl = req.body.image || req.body.avatar || req.user.picture;
+                } else {
+                    // Default placeholder image
+                    finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
+                }
+
+                // ৪. নাম প্রসেসিং
+                const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+
+                // ৫. ফাইনাল Agent Object তৈরি
+                const finalAgentData = {
+                    agentId: finalAgentId,
+                    name: fullName,
+                    firstName: firstName || fullName.split(' ')[0] || "",
+                    lastName: lastName || fullName.split(' ').slice(1).join(' ') || "",
+                    email: finalEmail,
+                    avatar: finalAvatarUrl,
+                    authProvider: authProvider || (req.user?.firebase?.sign_in_provider === 'google.com' ? 'google' : 'email'),
+                    paymentStatus: 'pending',
+                    createdAt: new Date()
+                };
+
+                // ৬. ডাটাবেজে ইনসার্ট
+                const result = await agentsCollection.insertOne(finalAgentData);
+
+                const savedAgent = {
+                    _id: result.insertedId,
+                    ...finalAgentData
+                };
+
+                return res.status(201).send({
+                    success: true,
+                    message: "Registration successful!",
+                    data: savedAgent
+                });
+
+            } catch (error) {
+                console.error("Error in agent registration API:", error);
+                return res.status(500).send({
+                    error: true,
+                    message: "Internal Server Error"
+                });
+            }
+        });
+
+
+        // 🚀 POST: /api/bookings
+        app.post('/api/bookings', async (req, res) => {
+            try {
+                const bookingData = req.body;
+                const { email, applicantName, contactNo, projectId, agentId } = bookingData;
+
+                // প্রয়োজনীয় ফিল্ড ভ্যালিডেশন
+                if (!email) {
+                    return res.status(400).json({ success: false, message: "Email is required!" });
+                }
+
+                if (!projectId) {
+                    return res.status(400).json({ success: false, message: "Project ID is required!" });
+                }
+
+                const normalizedEmail = email.toLowerCase().trim();
+
+                // ১. চেক করা ইউজার আগে থেকে আছে কি না
+                let user = await usersCollection.findOne({ email: normalizedEmail });
+                let autoGeneratedPassword = null;
+
+                if (!user) {
+                    // ইউজার না থাকলে নতুন পাসওয়ার্ড জেনারেট করা
+                    autoGeneratedPassword = 'pass_' + Math.random().toString(36).slice(-5);
+                    const hashedPassword = await bcrypt.hash(autoGeneratedPassword, 10);
+
+                    const newUser = {
+                        name: applicantName,
+                        email: normalizedEmail,
+                        phone: contactNo,
+                        password: hashedPassword,
+                        role: 'client',
+                        createdAt: new Date()
+                    };
+
+                    // 'users' কালেকশনে অটো ক্রিয়েট ও ইনসার্ট
+                    const userResult = await usersCollection.insertOne(newUser);
+                    user = { _id: userResult.insertedId, ...newUser };
+
+                    // নতুন ইউজারকে পাসওয়ার্ড ইমেইল করা
+                    try {
+                        await transporter.sendMail({
+                            from: '"Property Management" <noreply@yourdomain.com>',
+                            to: normalizedEmail,
+                            subject: 'Your Account Credentials for Property Portal',
+                            html: `
                         <h3>Dear ${applicantName},</h3>
                         <p>Thank you for submitting your property booking application.</p>
                         <p>An account has been automatically created for you to track your booking status.</p>
@@ -840,55 +839,55 @@ app.post('/api/bookings', async (req, res) => {
                         <br/>
                         <p>Please log in to your dashboard to view your booking details and updates.</p>
                     `
+                        });
+                    } catch (mailError) {
+                        console.error("Failed to send email:", mailError);
+                    }
+                }
+
+                // ২. 🔥 ডুপ্লিকেট বুকিং চেক: ইউজার এই প্রজেক্টটি অলরেডি বুক করেছেন কি না
+                const existingBookingQuery = {
+                    userId: user._id,
+                    $or: [
+                        { projectId: projectId },
+                        ...(ObjectId.isValid(projectId) ? [{ projectId: new ObjectId(projectId) }] : [])
+                    ]
+                };
+
+                const existingBooking = await bookingsCollection.findOne(existingBookingQuery);
+
+                if (existingBooking) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "You have already submitted a booking application for this project!"
+                    });
+                }
+
+                // ৩. বুকিং অবজেক্ট তৈরি
+                const newBookingDocument = {
+                    ...bookingData,
+                    projectId: ObjectId.isValid(projectId) ? new ObjectId(projectId) : projectId,
+                    userId: user._id,
+                    status: 'pending',
+                    agentId: agentId,
+                    createdAt: new Date()
+                };
+
+                // 'bookings' কালেকশনে ইনসার্ট
+                const bookingResult = await bookingsCollection.insertOne(newBookingDocument);
+
+                res.status(201).json({
+                    success: true,
+                    message: "Booking application submitted successfully!",
+                    bookingId: bookingResult.insertedId,
+                    accountCreated: !!autoGeneratedPassword
                 });
-            } catch (mailError) {
-                console.error("Failed to send email:", mailError);
+
+            } catch (error) {
+                console.error("Booking API Error:", error);
+                res.status(500).json({ success: false, message: "Internal server error during booking." });
             }
-        }
-
-        // ২. 🔥 ডুপ্লিকেট বুকিং চেক: ইউজার এই প্রজেক্টটি অলরেডি বুক করেছেন কি না
-        const existingBookingQuery = {
-            userId: user._id,
-            $or: [
-                { projectId: projectId },
-                ...(ObjectId.isValid(projectId) ? [{ projectId: new ObjectId(projectId) }] : [])
-            ]
-        };
-
-        const existingBooking = await bookingsCollection.findOne(existingBookingQuery);
-
-        if (existingBooking) {
-            return res.status(400).json({
-                success: false,
-                message: "You have already submitted a booking application for this project!"
-            });
-        }
-
-        // ৩. বুকিং অবজেক্ট তৈরি
-        const newBookingDocument = {
-            ...bookingData,
-            projectId: ObjectId.isValid(projectId) ? new ObjectId(projectId) : projectId,
-            userId: user._id,
-            status: 'pending',
-            agentId:agentId,
-            createdAt: new Date()
-        };
-
-        // 'bookings' কালেকশনে ইনসার্ট
-        const bookingResult = await bookingsCollection.insertOne(newBookingDocument);
-
-        res.status(201).json({
-            success: true,
-            message: "Booking application submitted successfully!",
-            bookingId: bookingResult.insertedId,
-            accountCreated: !!autoGeneratedPassword
         });
-
-    } catch (error) {
-        console.error("Booking API Error:", error);
-        res.status(500).json({ success: false, message: "Internal server error during booking." });
-    }
-});
 
 
         // blogs post api 
@@ -975,93 +974,93 @@ app.post('/api/bookings', async (req, res) => {
 
 
 
-    app.post('/api/submit-payment', async (req, res) => {
-    try {
-        const { bookingId, userId, amount, paymentMethod, bankName, transactionId,paymentType,senderName} = req.body;
+        app.post('/api/submit-payment', async (req, res) => {
+            try {
+                const { bookingId, userId, amount, paymentMethod, bankName, transactionId, paymentType, senderName } = req.body;
 
-        
-        // ১. প্রয়োজনীয় ফিল্ড চেক
-        if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'All required fields (bookingId, userId, amount, paymentMethod, transactionId) are needed.' 
-            });
-        }
 
-        // ২. ID গুলো ভ্যালিড MongoDB ObjectId কি না চেক
-        if (!ObjectId.isValid(bookingId) || !ObjectId.isValid(userId)) {
-            console.log("Invalid ObjectId passed:", { bookingId, userId });
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid bookingId or userId format.' 
-            });
-        }
+                // ১. প্রয়োজনীয় ফিল্ড চেক
+                if (!bookingId || !userId || !amount || !transactionId || !paymentMethod) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'All required fields (bookingId, userId, amount, paymentMethod, transactionId) are needed.'
+                    });
+                }
 
-        // ৩. বুকিং ডাটাবেজে উপস্থিত আছে কি না যাচাই
-        const bookingExists = await bookingsCollection.findOne({ _id: new ObjectId(bookingId) });
-        if (!bookingExists) {
-            return res.status(404).json({
-                success: false,
-                message: 'Target booking was not found.'
-            });
-        }
+                // ২. ID গুলো ভ্যালিড MongoDB ObjectId কি না চেক
+                if (!ObjectId.isValid(bookingId) || !ObjectId.isValid(userId)) {
+                    console.log("Invalid ObjectId passed:", { bookingId, userId });
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Invalid bookingId or userId format.'
+                    });
+                }
 
-        const formattedTxnId = String(transactionId).trim();
-        const numericAmount = Number(amount);
+                // ৩. বুকিং ডাটাবেজে উপস্থিত আছে কি না যাচাই
+                const bookingExists = await bookingsCollection.findOne({ _id: new ObjectId(bookingId) });
+                if (!bookingExists) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Target booking was not found.'
+                    });
+                }
 
-        if (isNaN(numericAmount) || numericAmount <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Payment amount must be a positive number.'
-            });
-        }
+                const formattedTxnId = String(transactionId).trim();
+                const numericAmount = Number(amount);
 
-        // ৪. Transaction ID ডুপ্লিকেট চেক (Case-Insensitive)
-        const existingTxn = await transactionsCollection.findOne({ 
-            transactionId: { $regex: new RegExp(`^${formattedTxnId}$`, 'i') } 
+                if (isNaN(numericAmount) || numericAmount <= 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Payment amount must be a positive number.'
+                    });
+                }
+
+                // ৪. Transaction ID ডুপ্লিকেট চেক (Case-Insensitive)
+                const existingTxn = await transactionsCollection.findOne({
+                    transactionId: { $regex: new RegExp(`^${formattedTxnId}$`, 'i') }
+                });
+
+                if (existingTxn) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Transaction ID already exists!'
+                    });
+                }
+
+                // ৫. নতুন অবজেক্ট তৈরি
+                const newTransaction = {
+                    bookingId: new ObjectId(bookingId),
+                    userId: new ObjectId(userId),
+                    amount: numericAmount,
+                    paymentType: paymentType,
+                    senderName: senderName,
+                    paymentMethod: String(paymentMethod).trim(),
+                    bankName: bankName ? String(bankName).trim() : 'N/A',
+                    transactionId: formattedTxnId,
+                    status: 'pending',
+                    createdAt: new Date()
+                };
+
+                // ৬. Transactions Collection এ ইনসার্ট
+                const txnResult = await transactionsCollection.insertOne(newTransaction);
+
+                // ৭. Bookings Collection আপডেট (Transaction ID Reference push করা)
+                await bookingsCollection.updateOne(
+                    { _id: new ObjectId(bookingId) },
+                    { $push: { transactions: txnResult.insertedId } }
+                );
+
+                res.status(201).json({
+                    success: true,
+                    message: 'Payment request submitted successfully. Pending verification.',
+                    data: { _id: txnResult.insertedId, ...newTransaction }
+                });
+
+            } catch (error) {
+                console.error("Error in /api/submit-payment:", error);
+                res.status(500).json({ success: false, message: error.message });
+            }
         });
-        
-        if (existingTxn) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Transaction ID already exists!' 
-            });
-        }
-
-        // ৫. নতুন অবজেক্ট তৈরি
-        const newTransaction = {
-            bookingId: new ObjectId(bookingId),
-            userId: new ObjectId(userId),
-            amount: numericAmount,
-            paymentType:paymentType,
-            senderName:senderName,
-            paymentMethod: String(paymentMethod).trim(),
-            bankName: bankName ? String(bankName).trim() : 'N/A',
-            transactionId: formattedTxnId,
-            status: 'pending',
-            createdAt: new Date()
-        };
-
-        // ৬. Transactions Collection এ ইনসার্ট
-        const txnResult = await transactionsCollection.insertOne(newTransaction);
-
-        // ৭. Bookings Collection আপডেট (Transaction ID Reference push করা)
-        await bookingsCollection.updateOne(
-            { _id: new ObjectId(bookingId) },
-            { $push: { transactions: txnResult.insertedId } }
-        );
-
-        res.status(201).json({
-            success: true,
-            message: 'Payment request submitted successfully. Pending verification.',
-            data: { _id: txnResult.insertedId, ...newTransaction }
-        });
-
-    } catch (error) {
-        console.error("Error in /api/submit-payment:", error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
 
 
 
@@ -1069,148 +1068,148 @@ app.post('/api/bookings', async (req, res) => {
         // ==========================================
         // ৩. এডমিন প্যানেল: Approve / Reject করার API
         // ==========================================
-app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
-    try {
-        const { txnId } = req.params;
-        const { status } = req.body; // 'approved' অথবা 'rejected'
+        app.patch('/api/admin/update-payment-status/:txnId', async (req, res) => {
+            try {
+                const { txnId } = req.params;
+                const { status } = req.body; // 'approved' অথবা 'rejected'
 
-        // ১. ইনপুট ও ObjectId ভ্যালিডেশন
-        if (!['approved', 'rejected'].includes(status)) {
-            return res.status(400).json({ success: false, message: 'Invalid status value.' });
-        }
-
-        if (!ObjectId.isValid(txnId)) {
-            return res.status(400).json({ success: false, message: 'Invalid Transaction ID format.' });
-        }
-
-        // ২. Transaction টি খুঁজে বের করা
-        const transaction = await transactionsCollection.findOne({ _id: new ObjectId(txnId) });
-
-        if (!transaction) {
-            return res.status(404).json({ success: false, message: 'Transaction not found.' });
-        }
-
-        // যদি স্ট্যাটাস ইতিমধ্যেই একই থাকে তবে রিডান্ড্যান্ট অপারেশন এড়ানো
-        if (transaction.status === status) {
-            return res.status(400).json({ 
-                success: false, 
-                message: `Transaction is already marked as ${status}.` 
-            });
-        }
-
-        const previousStatus = transaction.status;
-        const amount = Number(transaction.amount) || 0;
-
-        // ৩. Transaction এর স্ট্যাটাস আপডেট করা
-        await transactionsCollection.updateOne(
-            { _id: new ObjectId(txnId) },
-            { $set: { status: status, updatedAt: new Date() } }
-        );
-
-        // ৪. Booking ও Project আপডেট হ্যান্ডলিং
-        if (transaction.bookingId && ObjectId.isValid(transaction.bookingId)) {
-            const booking = await bookingsCollection.findOne({ _id: new ObjectId(transaction.bookingId) });
-
-            if (booking) {
-                let paidIncrement = 0;
-                let shareIncrement = 0;
-
-                // Case A: Pending/Rejected -> Approved (পেমেন্ট যোগ হবে)
-                if (status === 'approved' && previousStatus !== 'approved') {
-                    paidIncrement = amount;
-                    shareIncrement = 1;
-                }
-                // Case B: Approved -> Rejected (আগের পেমেন্ট রিভার্স/বিয়োগ হবে)
-                else if (status === 'rejected' && previousStatus === 'approved') {
-                    paidIncrement = -amount;
-                    shareIncrement = -1;
+                // ১. ইনপুট ও ObjectId ভ্যালিডেশন
+                if (!['approved', 'rejected'].includes(status)) {
+                    return res.status(400).json({ success: false, message: 'Invalid status value.' });
                 }
 
-                // ৪.১ Bookings Collection আপডেট (totalPaid ও totalDue সিঙ্ক)
-                if (paidIncrement !== 0) {
-                    const currentTotalPaid = Number(booking.totalPaid) || 0;
-                    const newTotalPaid = Math.max(0, currentTotalPaid + paidIncrement);
-                    const totalAmount = Number(booking.totalAmount) || 0;
-                    const newTotalDue = Math.max(0, totalAmount - newTotalPaid);
+                if (!ObjectId.isValid(txnId)) {
+                    return res.status(400).json({ success: false, message: 'Invalid Transaction ID format.' });
+                }
 
-                    await bookingsCollection.updateOne(
-                        { _id: new ObjectId(transaction.bookingId) },
-                        { 
-                            $set: { 
-                                totalPaid: newTotalPaid,
-                                totalDue: newTotalDue,
-                                updatedAt: new Date()
-                            } 
+                // ২. Transaction টি খুঁজে বের করা
+                const transaction = await transactionsCollection.findOne({ _id: new ObjectId(txnId) });
+
+                if (!transaction) {
+                    return res.status(404).json({ success: false, message: 'Transaction not found.' });
+                }
+
+                // যদি স্ট্যাটাস ইতিমধ্যেই একই থাকে তবে রিডান্ড্যান্ট অপারেশন এড়ানো
+                if (transaction.status === status) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Transaction is already marked as ${status}.`
+                    });
+                }
+
+                const previousStatus = transaction.status;
+                const amount = Number(transaction.amount) || 0;
+
+                // ৩. Transaction এর স্ট্যাটাস আপডেট করা
+                await transactionsCollection.updateOne(
+                    { _id: new ObjectId(txnId) },
+                    { $set: { status: status, updatedAt: new Date() } }
+                );
+
+                // ৪. Booking ও Project আপডেট হ্যান্ডলিং
+                if (transaction.bookingId && ObjectId.isValid(transaction.bookingId)) {
+                    const booking = await bookingsCollection.findOne({ _id: new ObjectId(transaction.bookingId) });
+
+                    if (booking) {
+                        let paidIncrement = 0;
+                        let shareIncrement = 0;
+
+                        // Case A: Pending/Rejected -> Approved (পেমেন্ট যোগ হবে)
+                        if (status === 'approved' && previousStatus !== 'approved') {
+                            paidIncrement = amount;
+                            shareIncrement = 1;
                         }
-                    );
+                        // Case B: Approved -> Rejected (আগের পেমেন্ট রিভার্স/বিয়োগ হবে)
+                        else if (status === 'rejected' && previousStatus === 'approved') {
+                            paidIncrement = -amount;
+                            shareIncrement = -1;
+                        }
+
+                        // ৪.১ Bookings Collection আপডেট (totalPaid ও totalDue সিঙ্ক)
+                        if (paidIncrement !== 0) {
+                            const currentTotalPaid = Number(booking.totalPaid) || 0;
+                            const newTotalPaid = Math.max(0, currentTotalPaid + paidIncrement);
+                            const totalAmount = Number(booking.totalAmount) || 0;
+                            const newTotalDue = Math.max(0, totalAmount - newTotalPaid);
+
+                            await bookingsCollection.updateOne(
+                                { _id: new ObjectId(transaction.bookingId) },
+                                {
+                                    $set: {
+                                        totalPaid: newTotalPaid,
+                                        totalDue: newTotalDue,
+                                        updatedAt: new Date()
+                                    }
+                                }
+                            );
+                        }
+
+                        // ৪.২ Projects Collection-এ totalShare সিঙ্ক
+                        if (shareIncrement !== 0 && booking.projectId && ObjectId.isValid(booking.projectId)) {
+                            await projectsCollection.updateOne(
+                                { _id: new ObjectId(booking.projectId) },
+                                { $inc: { totalShares: shareIncrement } }
+                            );
+                        }
+                    }
                 }
 
-                // ৪.২ Projects Collection-এ totalShare সিঙ্ক
-                if (shareIncrement !== 0 && booking.projectId && ObjectId.isValid(booking.projectId)) {
-                    await projectsCollection.updateOne(
-                        { _id: new ObjectId(booking.projectId) },
-                        { $inc: { totalShares: shareIncrement } }
-                    );
-                }
+                res.status(200).json({
+                    success: true,
+                    message: `Transaction status updated to '${status}' successfully.`,
+                    data: { txnId, status }
+                });
+
+            } catch (error) {
+                console.error("Error in /api/admin/update-payment-status:", error);
+                res.status(500).json({ success: false, message: error.message });
             }
-        }
-
-        res.status(200).json({
-            success: true,
-            message: `Transaction status updated to '${status}' successfully.`,
-            data: { txnId, status }
         });
 
-    } catch (error) {
-        console.error("Error in /api/admin/update-payment-status:", error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+        // -------------------------Stripe checkout session ----------------------
 
-// -------------------------Stripe checkout session ----------------------
+        app.post('/create-checkout-session', async (req, res) => {
+            const paymentInfo = req.body;
+            const price = parseInt(paymentInfo.planDetails.price) * 100
 
-  app.post('/create-checkout-session', async(req,res)=>{
-    const paymentInfo = req.body;
-    const price = parseInt(paymentInfo.planDetails.price)*100
-    
-    const session =await stripe.checkout.sessions.create({
+            const session = await stripe.checkout.sessions.create({
 
-    ui_mode: "hosted_page",
-    line_items: [
-      {
-        price_data:{
-            currency:'USD',
-            unit_amount:price,
-            product_data:{
-                name:paymentInfo.planDetails.planName
-            },
+                ui_mode: "hosted_page",
+                line_items: [
+                    {
+                        price_data: {
+                            currency: 'USD',
+                            unit_amount: price,
+                            product_data: {
+                                name: paymentInfo.planDetails.planName
+                            },
 
-        },
-        quantity: 1,
-      },
-    ],
-    customer_email:paymentInfo.customer.senderEmail,
-    mode: 'payment',
-    metadata:{
-    agentName:paymentInfo.customer.fullName,
-    agencyName:paymentInfo.customer.agencyName,
-    whatsappNumber:paymentInfo.customer.whatsappNumber,
-    senderEmail:paymentInfo.customer.senderEmail,
-    subdomain:paymentInfo.domainConfig.customUsername,
-    planName:paymentInfo.planDetails.planName,
-    planPrice:paymentInfo.planDetails.price,
-    planDuration:paymentInfo.planDetails.duration,
-    createdAt:paymentInfo.createdAt
+                        },
+                        quantity: 1,
+                    },
+                ],
+                customer_email: paymentInfo.customer.senderEmail,
+                mode: 'payment',
+                metadata: {
+                    agentName: paymentInfo.customer.fullName,
+                    agencyName: paymentInfo.customer.agencyName,
+                    whatsappNumber: paymentInfo.customer.whatsappNumber,
+                    senderEmail: paymentInfo.customer.senderEmail,
+                    subdomain: paymentInfo.domainConfig.customUsername,
+                    planName: paymentInfo.planDetails.planName,
+                    planPrice: paymentInfo.planDetails.price,
+                    planDuration: paymentInfo.planDetails.duration,
+                    createdAt: paymentInfo.createdAt
 
-    },
-    success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
-  })
-  console.log(session);
-  
-  res.send({url: session.url});
-  res.send( session);
-  })
+                },
+                success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
+            })
+            console.log(session);
+
+            res.send({ url: session.url });
+            res.send(session);
+        })
 
 
 
