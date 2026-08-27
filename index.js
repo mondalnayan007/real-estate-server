@@ -65,15 +65,7 @@ async function connectToMongoDB() {
         //  Get apis here  
 
 
-
-        // get all proects
-        // app.get('/projects', async (req, res) => {
-        //     const cursor = projectsCollection.find();
-        //     const result = await cursor.toArray();
-        //     res.send(result);
-        // })
-
-        // get single project 
+ 
 
         app.get('/projects', async (req, res) => {
             try {
@@ -139,7 +131,7 @@ async function connectToMongoDB() {
 
         app.get('/agents', async (req, res) => {
             const { hostname } = req.query;
-            const query = { targetDomain: hostname };
+            const query = { "metadata.targetAddress": hostname };
 
             const result = await agentsCollection.find(query).toArray();
 
@@ -550,13 +542,7 @@ async function connectToMongoDB() {
 
 
 
-        app.get('/session-status', async (req, res) => {
-
-            const { sessionId } = req.query;
-            const session = await stripe.checkout.sessions.retrieve(sessionId);
-            res.send(session.metadata)
-        })
-
+      
 
 
 
@@ -1170,6 +1156,7 @@ async function connectToMongoDB() {
 
         app.post('/create-checkout-session', async (req, res) => {
             const paymentInfo = req.body;
+            console.log(paymentInfo);
             const price = parseInt(paymentInfo.planDetails.price) * 100
 
             const session = await stripe.checkout.sessions.create({
@@ -1197,6 +1184,7 @@ async function connectToMongoDB() {
                     senderEmail: paymentInfo.customer.senderEmail,
                     subdomain: paymentInfo.domainConfig.customUsername,
                     planName: paymentInfo.planDetails.planName,
+                    targetAddress:paymentInfo.domainConfig.targetAddress,
                     planPrice: paymentInfo.planDetails.price,
                     planDuration: paymentInfo.planDetails.duration,
                     createdAt: paymentInfo.createdAt
@@ -1577,6 +1565,57 @@ async function connectToMongoDB() {
             res.send(result);
 
         })
+
+
+
+         app.patch('/session-status', async (req, res) => {
+    try {
+        const { sessionId } = req.query;
+
+        if (!sessionId) {
+            return res.status(400).send({ error: true, message: "Session ID is required" });
+        }
+
+        // ১. Stripe থেকে Checkout Session ফেচ করা
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        // ২. পেমেন্ট সফল হয়েছে কিনা চেক করা
+        if (session.payment_status === 'paid') {
+            const metadata = session.metadata || {};
+            const senderEmail = metadata.senderEmail; // Stripe metadata থেকে ইমেইল আনা
+
+            if (senderEmail) {
+                // ৩. MongoDB-তে email matches senderEmail কন্ডিশনে updateOne চালানো
+                await agentsCollection.updateOne(
+                    { email: senderEmail }, // কোয়েরি ম্যাচিং
+                    { 
+                        $set: { 
+                            metadata: metadata, // আগের ডাটার সাথে metadata অবজেক্ট অ্যাড বা আপডেট করা
+                            paymentStatus: 'paid',
+                            updatedAt: new Date()
+                        } 
+                    }
+                );
+            }
+        }
+
+        // ৪. ফ্রন্টএন্ডে metadata রিটার্ন করা
+        res.status(200).send(session.metadata);
+
+    } catch (error) {
+        console.error("Error updating session status:", error);
+        res.status(500).send({ error: true, message: error.message });
+    }
+});
+
+
+
+
+
+
+
+
+
         // update the settings
 
         app.patch('/settings', async (req, res) => {
