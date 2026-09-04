@@ -1155,49 +1155,72 @@ async function connectToMongoDB() {
         // -------------------------Stripe checkout session ----------------------
 
         app.post('/create-checkout-session', async (req, res) => {
-            const paymentInfo = req.body;
-            console.log(paymentInfo);
-            const price = parseInt(paymentInfo.planDetails.price) * 100
+    try {
+        const paymentInfo = req.body;
+        console.log(paymentInfo);
 
-            const session = await stripe.checkout.sessions.create({
+        const price = parseInt(paymentInfo.planDetails.price) * 100;
 
-                ui_mode: "hosted_page",
-                line_items: [
-                    {
-                        price_data: {
-                            currency: 'USD',
-                            unit_amount: price,
-                            product_data: {
-                                name: paymentInfo.planDetails.planName
-                            },
+        // 1. Calculate Start Date & End Date
+        const startDate = paymentInfo.createdAt ? new Date(paymentInfo.createdAt) : new Date();
+        const endDate = new Date(startDate);
 
+        // Plan Duration (monthly/yearly) base kore End Date set
+        if (paymentInfo.planDetails.duration === 'yearly') {
+            endDate.setFullYear(endDate.getFullYear() + 1);
+        } else {
+            // Default 1 Month Add
+            endDate.setMonth(endDate.getMonth() + 1);
+        }
+
+        // 2. Set Property Limits based on plan (Need customized rules if plans vary)
+        const propertyLimit = paymentInfo.planDetails.limits.listings || 10; 
+
+        const session = await stripe.checkout.sessions.create({
+            ui_mode: "hosted_page",
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'USD',
+                        unit_amount: price,
+                        product_data: {
+                            name: paymentInfo.planDetails.planName
                         },
-                        quantity: 1,
                     },
-                ],
-                customer_email: paymentInfo.customer.senderEmail,
-                mode: 'payment',
-                metadata: {
-                    agentName: paymentInfo.customer.fullName,
-                    agencyName: paymentInfo.customer.agencyName,
-                    whatsappNumber: paymentInfo.customer.whatsappNumber,
-                    senderEmail: paymentInfo.customer.senderEmail,
-                    subdomain: paymentInfo.domainConfig.customUsername,
-                    planName: paymentInfo.planDetails.planName,
-                    targetAddress:paymentInfo.domainConfig.targetAddress,
-                    planPrice: paymentInfo.planDetails.price,
-                    planDuration: paymentInfo.planDetails.duration,
-                    createdAt: paymentInfo.createdAt
-
+                    quantity: 1,
                 },
-                success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
-            })
-            console.log(session);
+            ],
+            customer_email: paymentInfo.customer.senderEmail,
+            mode: 'payment',
+            metadata: {
+                agentName: paymentInfo.customer.fullName || '',
+                agencyName: paymentInfo.customer.agencyName || '',
+                whatsappNumber: paymentInfo.customer.whatsappNumber || '',
+                senderEmail: paymentInfo.customer.senderEmail || '',
+                subdomain: paymentInfo.domainConfig.customUsername || '',
+                planName: paymentInfo.planDetails.planName || '',
+                targetAddress: paymentInfo.domainConfig.targetAddress || '',
+                planPrice: paymentInfo.planDetails.price ? paymentInfo.planDetails.price.toString() : '0',
+                planDuration: paymentInfo.planDetails.duration || 'monthly',
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),            
+                propertyLimit: propertyLimit.toString(),   
+                listedProperty: '0'                         
+            },
+            success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
+        });
 
-            res.send({ url: session.url });
-            res.send(session);
-        })
+        console.log(session);
+
+        // Response sending single JSON object
+        res.send({ url: session.url });
+
+    } catch (error) {
+        console.error("Stripe Checkout Error:", error);
+        res.status(500).send({ error: error.message });
+    }
+});
 
 
 
