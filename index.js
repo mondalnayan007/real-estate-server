@@ -129,15 +129,46 @@ async function connectToMongoDB() {
 
         // get all the agents data 
 
-        app.get('/agents', async (req, res) => {
-            const { hostname,email } = req.query;
-            const query = { "metadata.targetAddress": hostname, email:email};
+    app.get('/agents', async (req, res) => {
+    try {
+        const { hostname, email } = req.query;
 
-            const result = await agentsCollection.find(query).toArray();
+        
+        let query = {};
 
-            res.send(result);
-        })
+        if (hostname) {
+            query = { "metadata.targetAddress": hostname };
+        } else if (email) {
+            query = { email: email };
+        } else {
+           
+            return res.status(400).send({ 
+                error: true, 
+                message: "Please provide either hostname or email in query parameters." 
+            });
+        }
 
+        
+        const result = await agentsCollection.find(query).toArray();
+
+        // 3. Result Check
+        if (!result || result.length === 0) {
+            return res.status(404).send({ 
+                success: false, 
+                message: "No agent found matching the criteria." 
+            });
+        }
+
+        res.status(200).send(result);
+
+    } catch (error) {
+        console.error("Error fetching agents:", error);
+        res.status(500).send({ 
+            error: true, 
+            message: "Internal Server Error" 
+        });
+    }
+});
 
 
 
