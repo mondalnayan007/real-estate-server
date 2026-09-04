@@ -130,8 +130,8 @@ async function connectToMongoDB() {
         // get all the agents data 
 
         app.get('/agents', async (req, res) => {
-            const { hostname } = req.query;
-            const query = { "metadata.targetAddress": hostname };
+            const { hostname,email } = req.query;
+            const query = { "metadata.targetAddress": hostname, email:email};
 
             const result = await agentsCollection.find(query).toArray();
 
@@ -676,97 +676,91 @@ async function connectToMongoDB() {
 
         // add agent data 
         app.post('/api/agents/register', upload.single('image'), async (req, res) => {
+    try {
+        const {
+            firstName,
+            lastName,
+            email,
+            uid,
+            avatar,
+            authProvider
+        } = req.body;
+
+        const finalAgentId = uid || req.user?.uid;
+        const finalEmail = email || req.user?.email;
+
+        if (!finalEmail || !finalAgentId) {
+            return res.status(400).send({
+                error: true,
+                message: "User Email and ID are required!"
+            });
+        }
+
+        // ডুপ্লিকেট ইউজার চেক
+        const existingAgent = await agentsCollection.findOne({ email: finalEmail });
+        if (existingAgent) {
+            return res.status(400).send({
+                error: true,
+                message: "This Email or Account is already registered!"
+            });
+        }
+
+        // 📸 IMAGE UPLOAD LOGIC
+        let finalAvatarUrl = "";
+
+        // ১. যদি সিঙ্গেল ফাইল আপলোড হয় (upload.single('image'))
+        if (req.file) {
             try {
-                // ১. ফ্রন্টএন্ড এবং Auth Token থেকে ডাটা সংগ্রহ
-                const {
-
-                    firstName,
-                    lastName,
-                    email,
-                    uid,
-                    avatar,
-
-                    authProvider
-                } = req.body;
-                console.log(req.body);
-
-                const finalAgentId = uid || req.user?.uid;
-                const finalEmail = email || req.user?.email;
-
-                if (!finalEmail || !finalAgentId) {
-                    return res.status(400).send({
-                        error: true,
-                        message: "User Email and ID are required!"
-                    });
+                // req.file কে অ্যারে বানিয়ে পাঠাচ্ছি [req.file]
+                const uploadedUrls = await uploadToCloudinary([req.file]);
+                if (uploadedUrls && uploadedUrls.length > 0) {
+                    finalAvatarUrl = uploadedUrls[0];
                 }
-
-                // ২. ডুপ্লিকেট ইউজার চেক
-                const existingAgent = await agentsCollection.findOne({
-                    $or: [
-
-                        { email: finalEmail }
-                    ]
-                });
-
-                if (existingAgent) {
-                    return res.status(400).send({
-                        error: true,
-                        message: "This Email or Account is already registered!"
-                    });
-                }
-
-                // ৩. ইমেজের জন্য Cloudinary / External / Default Avatar সেটআপ
-                let finalAvatarUrl = "";
-
-                if (req.file && req.file.path) {
-                    const uploadedUrls = await uploadToCloudinary([req.file]);
-                    finalAvatarUrl = uploadedUrls[0] || "";
-                } else if (req.body.image || req.body.avatar || req.user?.picture) {
-                    // Google Sign-In বা external image URL
-                    finalAvatarUrl = req.body.image || req.body.avatar || req.user.picture;
-                } else {
-                    // Default placeholder image
-                    finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
-                }
-
-                // ৪. নাম প্রসেসিং
-                const fullName = `${firstName || ''} ${lastName || ''}`.trim();
-
-                // ৫. ফাইনাল Agent Object তৈরি
-                const finalAgentData = {
-                    agentId: finalAgentId,
-                    name: fullName,
-                    firstName: firstName || fullName.split(' ')[0] || "",
-                    lastName: lastName || fullName.split(' ').slice(1).join(' ') || "",
-                    email: finalEmail,
-                    avatar: finalAvatarUrl,
-                    authProvider: authProvider || (req.user?.firebase?.sign_in_provider === 'google.com' ? 'google' : 'email'),
-                    paymentStatus: 'pending',
-                    createdAt: new Date()
-                };
-
-                // ৬. ডাটাবেজে ইনসার্ট
-                const result = await agentsCollection.insertOne(finalAgentData);
-
-                const savedAgent = {
-                    _id: result.insertedId,
-                    ...finalAgentData
-                };
-
-                return res.status(201).send({
-                    success: true,
-                    message: "Registration successful!",
-                    data: savedAgent
-                });
-
-            } catch (error) {
-                console.error("Error in agent registration API:", error);
-                return res.status(500).send({
-                    error: true,
-                    message: "Internal Server Error"
-                });
+            } catch (imgErr) {
+                console.error("Cloudinary Upload Error:", imgErr);
             }
+        } 
+        
+        // ২. যদি গুগল সাইন-ইন বা এক্সটার্নাল ইমেজ URL হয়
+        if (!finalAvatarUrl) {
+            if (avatar || req.body.image || req.user?.picture) {
+                finalAvatarUrl = avatar || req.body.image || req.user?.picture;
+            } else {
+                // ৩. কোনোটিই না থাকলে ডিফল্ট প্লেসহোল্ডার
+                finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
+            }
+        }
+
+        const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+
+        const finalAgentData = {
+            agentId: finalAgentId,
+            name: fullName,
+            firstName: firstName || fullName.split(' ')[0] || "",
+            lastName: lastName || fullName.split(' ').slice(1).join(' ') || "",
+            email: finalEmail,
+            avatar: finalAvatarUrl,
+            authProvider: authProvider || (req.user?.firebase?.sign_in_provider === 'google.com' ? 'google' : 'email'),
+            paymentStatus: 'pending',
+            createdAt: new Date()
+        };
+
+        const result = await agentsCollection.insertOne(finalAgentData);
+
+        return res.status(201).send({
+            success: true,
+            message: "Registration successful!",
+            data: { _id: result.insertedId, ...finalAgentData }
         });
+
+    } catch (error) {
+        console.error("Error in agent registration API:", error);
+        return res.status(500).send({
+            error: true,
+            message: "Internal Server Error"
+        });
+    }
+});
 
 
         // 🚀 POST: /api/bookings
@@ -1157,7 +1151,7 @@ async function connectToMongoDB() {
         app.post('/create-checkout-session', async (req, res) => {
     try {
         const paymentInfo = req.body;
-        console.log(paymentInfo);
+        // console.log(paymentInfo);
 
         const price = parseInt(paymentInfo.planDetails.price) * 100;
 
