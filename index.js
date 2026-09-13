@@ -591,7 +591,14 @@ app.get('/agents', async (req, res) => {
         // to get the subscriptions data 
 
 
-        app.get('/')
+        app.get('/subscription', async(req,res)=>{
+            const {t_id} = req.query;
+
+            const query = {tran_id : t_id};
+
+            const result = await subscriptionsCollection.findOne(query);
+            res.send(result);
+        })
 
 
 
