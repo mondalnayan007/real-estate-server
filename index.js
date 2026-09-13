@@ -11,6 +11,12 @@ const { MongoClient, ObjectId } = require('mongodb');
 const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware, upload } = require('./utils/CloudinaryConfig');
 
 
+const SSLCommerzPayment = require('sslcommerz-lts')
+const store_id = process.env.STORE_ID
+const store_passwd = process.env.STORE_PASS
+const is_live = false //true for live, false for sandbox
+
+
 app.use(cors());
 app.use(express.json());
 
@@ -58,6 +64,7 @@ async function connectToMongoDB() {
         const transactionsCollection = db.collection('transactions');
         const membersCollection = db.collection('members');
         const blogsCollection = db.collection('blogs');
+        const subscriptionsCollection = db.collection('subscriptions');
 
 
 
@@ -129,29 +136,37 @@ async function connectToMongoDB() {
 
         // get all the agents data 
 
-    app.get('/agents', async (req, res) => {
+app.get('/agents', async (req, res) => {
     try {
         const { hostname, email } = req.query;
 
-        
         let query = {};
 
         if (hostname) {
-            query = { "metadata.targetAddress": hostname };
+            // "http://" ba "https://" ebong trailing slash "/" bad diye clean domain extract
+            const cleanHostname = hostname
+                .replace(/^https?:\/\//, '')
+                .replace(/\/$/, '')
+                .trim();
+
+            // Regex query: Protocol ba trailing slash er variation bypass korar jonno
+            query = { 
+                "metadata.targetAddress": { 
+                    $regex: cleanHostname, 
+                    $options: "i" 
+                } 
+            };
         } else if (email) {
-            query = { email: email };
+            query = { email: email.trim().toLowerCase() };
         } else {
-           
             return res.status(400).send({ 
                 error: true, 
                 message: "Please provide either hostname or email in query parameters." 
             });
         }
 
-        
         const result = await agentsCollection.find(query).toArray();
 
-        // 3. Result Check
         if (!result || result.length === 0) {
             return res.status(404).send({ 
                 success: false, 
@@ -159,11 +174,11 @@ async function connectToMongoDB() {
             });
         }
 
-        res.status(200).send(result);
+        return res.status(200).send(result);
 
     } catch (error) {
         console.error("Error fetching agents:", error);
-        res.status(500).send({ 
+        return res.status(500).send({ 
             error: true, 
             message: "Internal Server Error" 
         });
@@ -569,6 +584,14 @@ async function connectToMongoDB() {
                 });
             }
         });
+
+
+
+
+        // to get the subscriptions data 
+
+
+        app.get('/')
 
 
 
@@ -1179,75 +1202,266 @@ async function connectToMongoDB() {
 
         // -------------------------Stripe checkout session ----------------------
 
-        app.post('/create-checkout-session', async (req, res) => {
+//         app.post('/create-checkout-session', async (req, res) => {
+//     try {
+//         const paymentInfo = req.body;
+//         // console.log(paymentInfo);
+
+//         const price = parseInt(paymentInfo.planDetails.price) * 100;
+
+//         // 1. Calculate Start Date & End Date
+//         const startDate = paymentInfo.createdAt ? new Date(paymentInfo.createdAt) : new Date();
+//         const endDate = new Date(startDate);
+
+//         // Plan Duration (monthly/yearly) base kore End Date set
+//         if (paymentInfo.planDetails.duration === 'yearly') {
+//             endDate.setFullYear(endDate.getFullYear() + 1);
+//         } else {
+//             // Default 1 Month Add
+//             endDate.setMonth(endDate.getMonth() + 1);
+//         }
+
+//         // 2. Set Property Limits based on plan (Need customized rules if plans vary)
+//         const propertyLimit = paymentInfo.planDetails.limits.listings || 10; 
+
+//         const session = await stripe.checkout.sessions.create({
+//             ui_mode: "hosted_page",
+//             line_items: [
+//                 {
+//                     price_data: {
+//                         currency: 'USD',
+//                         unit_amount: price,
+//                         product_data: {
+//                             name: paymentInfo.planDetails.planName
+//                         },
+//                     },
+//                     quantity: 1,
+//                 },
+//             ],
+//             customer_email: paymentInfo.customer.senderEmail,
+//             mode: 'payment',
+//             metadata: {
+//                 agentName: paymentInfo.customer.fullName || '',
+//                 agencyName: paymentInfo.customer.agencyName || '',
+//                 whatsappNumber: paymentInfo.customer.whatsappNumber || '',
+//                 senderEmail: paymentInfo.customer.senderEmail || '',
+//                 subdomain: paymentInfo.domainConfig.customUsername || '',
+//                 planName: paymentInfo.planDetails.planName || '',
+//                 targetAddress: paymentInfo.domainConfig.targetAddress || '',
+//                 planPrice: paymentInfo.planDetails.price ? paymentInfo.planDetails.price.toString() : '0',
+//                 planDuration: paymentInfo.planDetails.duration || 'monthly',
+//                 startDate: startDate.toISOString(),
+//                 endDate: endDate.toISOString(),            
+//                 propertyLimit: propertyLimit.toString(),   
+//                 listedProperty: '0'                         
+//             },
+//             success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+//             cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
+//         });
+
+//         console.log(session);
+
+//         // Response sending single JSON object
+//         res.send({ url: session.url });
+
+//     } catch (error) {
+//         console.error("Stripe Checkout Error:", error);
+//         res.status(500).send({ error: error.message });
+//     }
+// });
+
+
+
+// ---------------------------SSL Commerz Payment Setup---------------------- 
+
+app.post('/create-checkout-session', async (req, res) => {
     try {
         const paymentInfo = req.body;
-        // console.log(paymentInfo);
+        const agentEmail = paymentInfo.customer?.senderEmail;
 
-        const price = parseInt(paymentInfo.planDetails.price) * 100;
+        if (!agentEmail) {
+            return res.status(400).send({ error: true, message: "Agent email is required." });
+        }
 
-        // 1. Calculate Start Date & End Date
-        const startDate = paymentInfo.createdAt ? new Date(paymentInfo.createdAt) : new Date();
+        // 🔒 VALIDATION 1: Check Active Subscription in Agents Collection
+        const existingAgent = await agentsCollection.findOne({ email: agentEmail });
+
+        if (existingAgent && existingAgent.paymentStatus === 'paid' && existingAgent.metadata?.endDate) {
+            const currentDate = new Date();
+            const planEndDate = new Date(existingAgent.metadata.endDate);
+
+            if (planEndDate > currentDate) {
+                return res.status(400).send({
+                    error: true,
+                    activePlan: true,
+                    message: `Apnar ekti active plan chaluk ache ja ${planEndDate.toLocaleDateString()} porjonto meyadi. Meyadh sesh hobar aage notun plan purchase kora jabe na.`
+                });
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Payment Payload & Dates Setup
+        // -------------------------------------------------------------
+        const totalAmount = parseFloat(paymentInfo.planDetails?.price || 0);
+        const tran_id = `TRAN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        const startDate = new Date();
         const endDate = new Date(startDate);
 
-        // Plan Duration (monthly/yearly) base kore End Date set
-        if (paymentInfo.planDetails.duration === 'yearly') {
+        if (paymentInfo.planDetails?.duration === 'yearly') {
             endDate.setFullYear(endDate.getFullYear() + 1);
         } else {
-            // Default 1 Month Add
             endDate.setMonth(endDate.getMonth() + 1);
         }
 
-        // 2. Set Property Limits based on plan (Need customized rules if plans vary)
-        const propertyLimit = paymentInfo.planDetails.limits.listings || 10; 
+        const propertyLimit = paymentInfo.planDetails?.limits?.listings || 10;
 
-        const session = await stripe.checkout.sessions.create({
-            ui_mode: "hosted_page",
-            line_items: [
-                {
-                    price_data: {
-                        currency: 'USD',
-                        unit_amount: price,
-                        product_data: {
-                            name: paymentInfo.planDetails.planName
-                        },
-                    },
-                    quantity: 1,
-                },
-            ],
-            customer_email: paymentInfo.customer.senderEmail,
-            mode: 'payment',
-            metadata: {
-                agentName: paymentInfo.customer.fullName || '',
-                agencyName: paymentInfo.customer.agencyName || '',
-                whatsappNumber: paymentInfo.customer.whatsappNumber || '',
-                senderEmail: paymentInfo.customer.senderEmail || '',
-                subdomain: paymentInfo.domainConfig.customUsername || '',
-                planName: paymentInfo.planDetails.planName || '',
-                targetAddress: paymentInfo.domainConfig.targetAddress || '',
-                planPrice: paymentInfo.planDetails.price ? paymentInfo.planDetails.price.toString() : '0',
-                planDuration: paymentInfo.planDetails.duration || 'monthly',
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),            
-                propertyLimit: propertyLimit.toString(),   
-                listedProperty: '0'                         
-            },
-            success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
+        const customMetadata = {
+            agencyName: paymentInfo.customer?.agencyName || '',
+            agentName: paymentInfo.customer?.fullName || '',
+            senderEmail: agentEmail,
+            whatsappNumber: paymentInfo.customer?.whatsappNumber || '',
+            subdomain: paymentInfo.domainConfig?.customUsername || '',
+            targetAddress: paymentInfo.domainConfig?.targetAddress || '',
+            planName: paymentInfo.planDetails?.planName || '',
+            planPrice: paymentInfo.planDetails?.price ? paymentInfo.planDetails.price.toString() : '0',
+            planDuration: paymentInfo.planDetails?.duration || 'monthly',
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            propertyLimit: propertyLimit.toString(),
+            listedProperty: '0'
+        };
+
+        // -------------------------------------------------------------
+        // 📦 Subscriptions Collection-e Entry (Initial Status: 'pending')
+        // -------------------------------------------------------------
+        const subscriptionDoc = {
+            tran_id: tran_id,
+            agentEmail: agentEmail,
+            amount: totalAmount,
+            paymentStatus: 'pending', // SSLCommerz-e jawar aage pending
+            planDetails: paymentInfo.planDetails,
+            customerDetails: paymentInfo.customer,
+            domainConfig: paymentInfo.domainConfig,
+            metadata: customMetadata,
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+
+        // Subscription Collection-e insert korbe
+        await subscriptionsCollection.insertOne(subscriptionDoc);
+
+        // -------------------------------------------------------------
+        // SSLCommerz Payload Setup
+        // -------------------------------------------------------------
+        const data = {
+            total_amount: totalAmount,
+            currency: 'BDT',
+            tran_id: tran_id,
+            success_url: `${process.env.SITE_DOMAIN}/api/payment-success?tran_id=${tran_id}`,
+            fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${tran_id}`,
+            cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${tran_id}`,
+            ipn_url: `${process.env.SITE_DOMAIN}/api/payment-ipn`,
+
+            shipping_method: 'NO',
+            product_name: paymentInfo.planDetails?.planName || 'Agent Plan Subscription',
+            product_category: 'Digital Service',
+            product_profile: 'non-physical-goods',
+
+            cus_name: paymentInfo.customer?.fullName || 'Valued Agent',
+            cus_email: agentEmail,
+            cus_add1: paymentInfo.customer?.agencyName || 'Dhaka',
+            cus_add2: 'Dhaka',
+            cus_city: 'Dhaka',
+            cus_state: 'Dhaka',
+            cus_postcode: '1000',
+            cus_country: 'Bangladesh',
+            cus_phone: paymentInfo.customer?.whatsappNumber || '01700000000',
+            cus_fax: paymentInfo.customer?.whatsappNumber || '01700000000',
+
+            ship_name: paymentInfo.customer?.fullName || 'Valued Agent',
+            ship_add1: 'Dhaka',
+            ship_add2: 'Dhaka',
+            ship_city: 'Dhaka',
+            ship_state: 'Dhaka',
+            ship_postcode: 1000,
+            ship_country: 'Bangladesh',
+
+            value_a: tran_id // value_a te just tran_id rekhe dilam
+        };
+
+        const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+
+        sslcz.init(data).then(apiResponse => {
+            let GatewayPageURL = apiResponse.GatewayPageURL;
+
+            if (GatewayPageURL) {
+                res.status(200).send({ url: GatewayPageURL });
+            } else {
+                res.status(400).send({ error: true, message: "SSLCommerz Gateway URL generation failed." });
+            }
         });
 
-        console.log(session);
-
-        // Response sending single JSON object
-        res.send({ url: session.url });
-
     } catch (error) {
-        console.error("Stripe Checkout Error:", error);
-        res.status(500).send({ error: error.message });
+        console.error("SSLCommerz Payment Init Error:", error);
+        res.status(500).send({ error: true, message: error.message || "Internal Server Error" });
     }
 });
 
 
+
+
+
+app.post('/api/payment-success', async (req, res) => {
+    try {
+        const tran_id = req.query.tran_id || req.body.tran_id;
+
+        if (!tran_id) {
+            return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Transaction ID missing`);
+        }
+
+        // 📌 Step 1: Subscriptions Collection theke tran_id diye data khuje ber kora
+        const subscription = await subscriptionsCollection.findOne({ tran_id: tran_id });
+
+        if (!subscription) {
+            return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Subscription record not found`);
+        }
+
+        const { agentEmail, metadata } = subscription;
+
+        // 📌 Step 2: Subscriptions Collection-e paymentStatus 'paid' kora
+        await subscriptionsCollection.updateOne(
+            { tran_id: tran_id },
+            {
+                $set: {
+                    paymentStatus: 'paid',
+                    updatedAt: new Date()
+                }
+            }
+        );
+
+        // 📌 Step 3: Agent Collection-e status 'paid' & Metadata Merge/Update kora
+        await agentsCollection.updateOne(
+            { email: agentEmail },
+            {
+                $set: {
+                    paymentStatus: 'paid',
+                    subscriptionTranId: tran_id,
+                    metadata: metadata,
+                    updatedAt: new Date()
+                }
+            },
+            { upsert: true } // Agent db te na thakle new agent document toiri hoye jabe
+        );
+
+        // 📌 Step 4: Success page-e Frontend-e redirect kora
+        return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-success?tran_id=${tran_id}`);
+
+    } catch (error) {
+        console.error("Payment Success Handler Error:", error);
+        return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Internal Server Error`);
+    }
+});
 
 
         // ------------------------------------------------------------------
