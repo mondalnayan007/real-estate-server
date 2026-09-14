@@ -1416,6 +1416,114 @@ app.post('/create-checkout-session', async (req, res) => {
 });
 
 
+// create plan renewal  api  
+
+
+app.post('/create-renew-session', async (req, res) => {
+    try {
+        const renewalInfo = req.body;
+        console.log(renewalInfo);
+        const agentEmail = renewalInfo.customer?.senderEmail;
+
+        // if (!agentEmail) {
+        //     return res.status(400).send({ error: true, message: "Agent email is required." });
+        // }
+
+        // // 🔒 VALIDATION 1: Check Active Subscription in Agents Collection
+        // const existingAgent = await agentsCollection.findOne({ email: agentEmail });
+
+        // if (existingAgent && existingAgent.paymentStatus === 'paid' && existingAgent.metadata?.endDate) {
+        //     const currentDate = new Date();
+        //     const planEndDate = new Date(existingAgent.metadata.endDate);
+
+        //     if (planEndDate > currentDate) {
+        //         return res.status(400).send({
+        //             error: true,
+        //             activePlan: true,
+        //             message: `Apnar ekti active plan chaluk ache ja ${planEndDate.toLocaleDateString()} porjonto meyadi. Meyadh sesh hobar aage notun plan purchase kora jabe na.`
+        //         });
+        //     }
+        // }
+
+        // -------------------------------------------------------------
+        // Payment Payload & Dates Setup
+        // -------------------------------------------------------------
+        // const totalAmount = parseFloat(renewalInfo.planDetails?.price || 0);
+        // const tran_id = `TRAN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        // const startDate = new Date();
+        // const endDate = new Date(startDate);
+
+        // if (renewalInfo.planDetails?.duration === 'yearly') {
+        //     endDate.setFullYear(endDate.getFullYear() + 1);
+        // } else {
+        //     endDate.setMonth(endDate.getMonth() + 1);
+        // }
+
+        // const propertyLimit = renewalInfo.planDetails?.limits?.listings || 10;
+
+   
+
+        
+      
+        // -------------------------------------------------------------
+        // SSLCommerz Payload Setup
+        // -------------------------------------------------------------
+        // const data = {
+        //     total_amount: totalAmount,
+        //     currency: 'BDT',
+        //     tran_id: tran_id,
+        //     success_url: `${process.env.SITE_DOMAIN}/api/payment-success?tran_id=${tran_id}`,
+        //     fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${tran_id}`,
+        //     cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${tran_id}`,
+        //     ipn_url: `${process.env.SITE_DOMAIN}/api/payment-ipn`,
+
+        //     shipping_method: 'NO',
+        //     product_name: renewalInfo.planDetails?.planName || 'Agent Plan Subscription',
+        //     product_category: 'Digital Service',
+        //     product_profile: 'non-physical-goods',
+
+        //     cus_name: renewalInfo.customer?.fullName || 'Valued Agent',
+        //     cus_email: agentEmail,
+        //     cus_add1: renewalInfo.customer?.agencyName || 'Dhaka',
+        //     cus_add2: 'Dhaka',
+        //     cus_city: 'Dhaka',
+        //     cus_state: 'Dhaka',
+        //     cus_postcode: '1000',
+        //     cus_country: 'Bangladesh',
+        //     cus_phone: renewalInfo.customer?.whatsappNumber || '01700000000',
+        //     cus_fax: renewalInfo.customer?.whatsappNumber || '01700000000',
+
+        //     ship_name: renewalInfo.customer?.fullName || 'Valued Agent',
+        //     ship_add1: 'Dhaka',
+        //     ship_add2: 'Dhaka',
+        //     ship_city: 'Dhaka',
+        //     ship_state: 'Dhaka',
+        //     ship_postcode: 1000,
+        //     ship_country: 'Bangladesh',
+
+        //     value_a: tran_id // value_a te just tran_id rekhe dilam
+        // };
+
+        // const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+
+        // sslcz.init(data).then(apiResponse => {
+        //     let GatewayPageURL = apiResponse.GatewayPageURL;
+
+        //     if (GatewayPageURL) {
+        //         res.status(200).send({ url: GatewayPageURL });
+        //     } else {
+        //         res.status(400).send({ error: true, message: "SSLCommerz Gateway URL generation failed." });
+        //     }
+        // });
+
+    } catch (error) {
+        // console.error("SSLCommerz Payment Init Error:", error);
+        // res.status(500).send({ error: true, message: error.message || "Internal Server Error" });
+    }
+});
+
+
 
 
 
