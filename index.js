@@ -1422,8 +1422,28 @@ app.post('/create-checkout-session', async (req, res) => {
 app.post('/create-renew-session', async (req, res) => {
     try {
         const renewalInfo = req.body;
-        console.log(renewalInfo);
-        const agentEmail = renewalInfo.customer?.senderEmail;
+       
+        const agentEmail = renewalInfo.planDetails.senderEmail;
+        console.log(agentEmail);
+        
+
+        const query = {agentEmail: agentEmail};
+        console.log(query);
+        const updatedData = {
+            $set: {
+                amount:renewalInfo.planDetails.price,
+            }
+        }
+        const options ={};
+        const result = await subscriptionsCollection.updateOne(query,updatedData,options);
+
+
+
+        console.log(result);
+
+
+
+
 
         // if (!agentEmail) {
         //     return res.status(400).send({ error: true, message: "Agent email is required." });
