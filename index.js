@@ -9,6 +9,7 @@ const port = process.env.PORT || 3000
 const stripe = require("stripe")(process.env.STRIP_SECRET);
 const { MongoClient, ObjectId } = require('mongodb');
 const { uploadImagesMiddleware, uploadToCloudinary, settingsUploadMiddleware, upload } = require('./utils/CloudinaryConfig');
+const { calculateSubscriptionDates } = require('./utils/durationCalc.js');
 
 
 const SSLCommerzPayment = require('sslcommerz-lts')
@@ -1420,73 +1421,73 @@ async function connectToMongoDB() {
 
 
         app.post('/create-renew-session', async (req, res) => {
-    try {
-        const { planDetails } = req.body;
-        console.log(planDetails);
-        const agentEmail = planDetails?.senderEmail;
+            try {
+                const { planDetails } = req.body;
+                console.log(planDetails);
+                const agentEmail = planDetails?.senderEmail;
 
-        if (!agentEmail) {
-            return res.status(400).send({ error: true, message: "Agent email is required." });
-        }
+                if (!agentEmail) {
+                    return res.status(400).send({ error: true, message: "Agent email is required." });
+                }
 
-        const totalAmount = parseFloat(planDetails?.price || 0);
-        const new_tran_id = `RENEW_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                const totalAmount = parseFloat(planDetails?.price || 0);
+                const new_tran_id = `RENEW_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-        const renewalInfo = {
-            renewal_id : new_tran_id,
-            planDetails:planDetails,
-            renewalStatus:false
-        };
+                const renewalInfo = {
+                    renewal_id: new_tran_id,
+                    planDetails: planDetails,
+                    renewalStatus: false
+                };
 
-        await subscriptionsCollection.insertOne(renewalInfo);
+                await subscriptionsCollection.insertOne(renewalInfo);
 
-        // 📌 SSLCommerz Payload Setup
-        const data = {
-            total_amount: totalAmount,
-            currency: 'BDT',
-            tran_id: new_tran_id,
-            success_url: `${process.env.SITE_DOMAIN}/api/renewal-success?tran_id=${new_tran_id}`,
-            fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${new_tran_id}`,
-            cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${new_tran_id}`,
-            ipn_url: `${process.env.SITE_DOMAIN}/api/payment-ipn`,
+                // 📌 SSLCommerz Payload Setup
+                const data = {
+                    total_amount: totalAmount,
+                    currency: 'BDT',
+                    tran_id: new_tran_id,
+                    success_url: `${process.env.SITE_DOMAIN}/api/renewal-success?tran_id=${new_tran_id}`,
+                    fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${new_tran_id}`,
+                    cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${new_tran_id}`,
+                    ipn_url: `${process.env.SITE_DOMAIN}/api/payment-ipn`,
 
-            shipping_method: 'NO',
-            product_name: `Renewal: ${planDetails?.planName || 'Agent Plan'}`,
-            product_category: 'Digital Service',
-            product_profile: 'non-physical-goods',
+                    shipping_method: 'NO',
+                    product_name: `Renewal: ${planDetails?.planName || 'Agent Plan'}`,
+                    product_category: 'Digital Service',
+                    product_profile: 'non-physical-goods',
 
-            cus_name: 'Valued Agent',
-            cus_email: agentEmail,
-            cus_add1: 'Dhaka',
-            cus_city: 'Dhaka',
-            cus_postcode: '1000',
-            cus_country: 'Bangladesh',
-            cus_phone: '01700000000',
+                    cus_name: 'Valued Agent',
+                    cus_email: agentEmail,
+                    cus_add1: 'Dhaka',
+                    cus_city: 'Dhaka',
+                    cus_postcode: '1000',
+                    cus_country: 'Bangladesh',
+                    cus_phone: '01700000000',
 
-            
-        };
 
-        const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+                };
 
-        sslcz.init(data).then(apiResponse => {
-            let GatewayPageURL = apiResponse.GatewayPageURL;
+                const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
 
-            if (GatewayPageURL) {
-                res.status(200).send({ url: GatewayPageURL });
-            } else {
-                res.status(400).send({ error: true, message: "SSLCommerz Gateway URL generation failed." });
+                sslcz.init(data).then(apiResponse => {
+                    let GatewayPageURL = apiResponse.GatewayPageURL;
+
+                    if (GatewayPageURL) {
+                        res.status(200).send({ url: GatewayPageURL });
+                    } else {
+                        res.status(400).send({ error: true, message: "SSLCommerz Gateway URL generation failed." });
+                    }
+                });
+
+            } catch (error) {
+                console.error("Renewal Init Error:", error);
+                res.status(500).send({ error: true, message: error.message || "Internal Server Error" });
             }
         });
 
-    } catch (error) {
-        console.error("Renewal Init Error:", error);
-        res.status(500).send({ error: true, message: error.message || "Internal Server Error" });
-    }
-});
 
 
-
-//    ssl commerz payment success 
+        //    ssl commerz payment success 
 
         app.post('/api/payment-success', async (req, res) => {
             try {
@@ -1544,7 +1545,7 @@ async function connectToMongoDB() {
         // renewal success api 
 
 
-app.post('/api/renewal-success', async (req, res) => {
+        app.post('/api/renewal-success', async (req, res) => {
             try {
                 const tran_id = req.query.tran_id || req.body.tran_id;
                 console.log(tran_id);
@@ -1556,29 +1557,47 @@ app.post('/api/renewal-success', async (req, res) => {
 
                 const renewalInfo = await subscriptionsCollection.findOne({ renewal_id: tran_id });
 
-                const senderEmail= renewalInfo.senderEmail;
-                console.log(renewalInfo);
+                const senderEmail = renewalInfo.planDetails.senderEmail;
+
 
 
                 // 📌 Step 1: Subscriptions Collection theke tran_id diye data khuje ber kora
-                const subscription = await subscriptionsCollection.findOne({ agentEmail:senderEmail });
+                const subscription = await subscriptionsCollection.findOne({ agentEmail: senderEmail });
+                console.log('renewal data :', renewalInfo, 'subscription data :', subscription);
 
                 if (!subscription) {
                     return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Subscription record not found`);
                 }
 
-                // const { agentEmail, metadata } = subscription;
+                const duration = renewalInfo.planDetails.duration; // 'monthly' অথবা 'yearly'
+                const currentEndDateInDB = subscription?.metadata?.endDate; // ডাটাবেজে থাকা বর্তমান মেয়াদ
+
+                // ফাংশন কল করে নতুন তারিখ দুটো বের করে নেওয়া
+                const { startDate, endDate } = calculateSubscriptionDates(currentEndDateInDB, duration);
 
                 // 📌 Step 2: Subscriptions Collection-e paymentStatus 'paid' kora
-                // await subscriptionsCollection.updateOne(
-                //     { tran_id: tran_id },
-                //     {
-                //         $set: {
-                //             paymentStatus: 'paid',
-                //             updatedAt: new Date()
-                //         }
-                //     }
-                // );
+                await subscriptionsCollection.updateOne(
+                    { agentEmail: senderEmail },
+                    {
+                        $set: {
+                            amount: renewalInfo.planDetails.price,
+                            'planDetails.planId': renewalInfo.planDetails.planId,
+                            'planDetails.planName': renewalInfo.planDetails.planName,
+                            'planDetails.price': renewalInfo.planDetails.price,
+                            'planDetails.duration': renewalInfo.planDetails.duration,
+                            'planDetails.limits.listings': renewalInfo.planDetails.limits.listings,
+                            'metadata.planName': renewalInfo.planDetails.planName,
+                            'metadata.planPrice': renewalInfo.planDetails.planPrice,
+                            'metadata.planDuration': renewalInfo.planDetails.duration,
+                            'metadata.startDate': startDate,
+                            'metadata.endDate': endDate,
+                            'metadata.propertyLimit': renewalInfo.planDetails.limits.listings,
+
+
+
+                        }
+                    }
+                );
 
                 // 📌 Step 3: Agent Collection-e status 'paid' & Metadata Merge/Update kora
                 // await agentsCollection.updateOne(
