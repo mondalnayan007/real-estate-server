@@ -72,7 +72,7 @@ async function connectToMongoDB() {
         //  Get apis here  
 
 
- 
+
 
         app.get('/projects', async (req, res) => {
             try {
@@ -136,54 +136,54 @@ async function connectToMongoDB() {
 
         // get all the agents data 
 
-app.get('/agents', async (req, res) => {
-    try {
-        const { hostname, email } = req.query;
+        app.get('/agents', async (req, res) => {
+            try {
+                const { hostname, email } = req.query;
 
-        let query = {};
+                let query = {};
 
-        if (hostname) {
-            // "http://" ba "https://" ebong trailing slash "/" bad diye clean domain extract
-            const cleanHostname = hostname
-                .replace(/^https?:\/\//, '')
-                .replace(/\/$/, '')
-                .trim();
+                if (hostname) {
+                    // "http://" ba "https://" ebong trailing slash "/" bad diye clean domain extract
+                    const cleanHostname = hostname
+                        .replace(/^https?:\/\//, '')
+                        .replace(/\/$/, '')
+                        .trim();
 
-            // Regex query: Protocol ba trailing slash er variation bypass korar jonno
-            query = { 
-                "metadata.targetAddress": { 
-                    $regex: cleanHostname, 
-                    $options: "i" 
-                } 
-            };
-        } else if (email) {
-            query = { email: email.trim().toLowerCase() };
-        } else {
-            return res.status(400).send({ 
-                error: true, 
-                message: "Please provide either hostname or email in query parameters." 
-            });
-        }
+                    // Regex query: Protocol ba trailing slash er variation bypass korar jonno
+                    query = {
+                        "metadata.targetAddress": {
+                            $regex: cleanHostname,
+                            $options: "i"
+                        }
+                    };
+                } else if (email) {
+                    query = { email: email.trim().toLowerCase() };
+                } else {
+                    return res.status(400).send({
+                        error: true,
+                        message: "Please provide either hostname or email in query parameters."
+                    });
+                }
 
-        const result = await agentsCollection.find(query).toArray();
+                const result = await agentsCollection.find(query).toArray();
 
-        if (!result || result.length === 0) {
-            return res.status(404).send({ 
-                success: false, 
-                message: "No agent found matching the criteria." 
-            });
-        }
+                if (!result || result.length === 0) {
+                    return res.status(404).send({
+                        success: false,
+                        message: "No agent found matching the criteria."
+                    });
+                }
 
-        return res.status(200).send(result);
+                return res.status(200).send(result);
 
-    } catch (error) {
-        console.error("Error fetching agents:", error);
-        return res.status(500).send({ 
-            error: true, 
-            message: "Internal Server Error" 
+            } catch (error) {
+                console.error("Error fetching agents:", error);
+                return res.status(500).send({
+                    error: true,
+                    message: "Internal Server Error"
+                });
+            }
         });
-    }
-});
 
 
 
@@ -591,10 +591,10 @@ app.get('/agents', async (req, res) => {
         // to get the subscriptions data 
 
 
-        app.get('/subscription', async(req,res)=>{
-            const {t_id} = req.query;
+        app.get('/subscription', async (req, res) => {
+            const { t_id } = req.query;
 
-            const query = {tran_id : t_id};
+            const query = { tran_id: t_id };
 
             const result = await subscriptionsCollection.findOne(query);
             res.send(result);
@@ -603,7 +603,7 @@ app.get('/agents', async (req, res) => {
 
 
 
-      
+
 
 
 
@@ -737,91 +737,91 @@ app.get('/agents', async (req, res) => {
 
         // add agent data 
         app.post('/api/agents/register', upload.single('image'), async (req, res) => {
-    try {
-        const {
-            firstName,
-            lastName,
-            email,
-            uid,
-            avatar,
-            authProvider
-        } = req.body;
-
-        const finalAgentId = uid || req.user?.uid;
-        const finalEmail = email || req.user?.email;
-
-        if (!finalEmail || !finalAgentId) {
-            return res.status(400).send({
-                error: true,
-                message: "User Email and ID are required!"
-            });
-        }
-
-        // ডুপ্লিকেট ইউজার চেক
-        const existingAgent = await agentsCollection.findOne({ email: finalEmail });
-        if (existingAgent) {
-            return res.status(400).send({
-                error: true,
-                message: "This Email or Account is already registered!"
-            });
-        }
-
-        // 📸 IMAGE UPLOAD LOGIC
-        let finalAvatarUrl = "";
-
-        // ১. যদি সিঙ্গেল ফাইল আপলোড হয় (upload.single('image'))
-        if (req.file) {
             try {
-                // req.file কে অ্যারে বানিয়ে পাঠাচ্ছি [req.file]
-                const uploadedUrls = await uploadToCloudinary([req.file]);
-                if (uploadedUrls && uploadedUrls.length > 0) {
-                    finalAvatarUrl = uploadedUrls[0];
+                const {
+                    firstName,
+                    lastName,
+                    email,
+                    uid,
+                    avatar,
+                    authProvider
+                } = req.body;
+
+                const finalAgentId = uid || req.user?.uid;
+                const finalEmail = email || req.user?.email;
+
+                if (!finalEmail || !finalAgentId) {
+                    return res.status(400).send({
+                        error: true,
+                        message: "User Email and ID are required!"
+                    });
                 }
-            } catch (imgErr) {
-                console.error("Cloudinary Upload Error:", imgErr);
+
+                // ডুপ্লিকেট ইউজার চেক
+                const existingAgent = await agentsCollection.findOne({ email: finalEmail });
+                if (existingAgent) {
+                    return res.status(400).send({
+                        error: true,
+                        message: "This Email or Account is already registered!"
+                    });
+                }
+
+                // 📸 IMAGE UPLOAD LOGIC
+                let finalAvatarUrl = "";
+
+                // ১. যদি সিঙ্গেল ফাইল আপলোড হয় (upload.single('image'))
+                if (req.file) {
+                    try {
+                        // req.file কে অ্যারে বানিয়ে পাঠাচ্ছি [req.file]
+                        const uploadedUrls = await uploadToCloudinary([req.file]);
+                        if (uploadedUrls && uploadedUrls.length > 0) {
+                            finalAvatarUrl = uploadedUrls[0];
+                        }
+                    } catch (imgErr) {
+                        console.error("Cloudinary Upload Error:", imgErr);
+                    }
+                }
+
+                // ২. যদি গুগল সাইন-ইন বা এক্সটার্নাল ইমেজ URL হয়
+                if (!finalAvatarUrl) {
+                    if (avatar || req.body.image || req.user?.picture) {
+                        finalAvatarUrl = avatar || req.body.image || req.user?.picture;
+                    } else {
+                        // ৩. কোনোটিই না থাকলে ডিফল্ট প্লেসহোল্ডার
+                        finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
+                    }
+                }
+
+                const fullName = `${firstName || ''} ${lastName || ''}`.trim();
+
+                const finalAgentData = {
+                    agentId: finalAgentId,
+                    name: fullName,
+                    firstName: firstName || fullName.split(' ')[0] || "",
+                    lastName: lastName || fullName.split(' ').slice(1).join(' ') || "",
+                    email: finalEmail,
+                    avatar: finalAvatarUrl,
+                    authProvider: authProvider || (req.user?.firebase?.sign_in_provider === 'google.com' ? 'google' : 'email'),
+                    paymentStatus: 'pending',
+                    createdAt: new Date()
+                };
+
+                const result = await agentsCollection.insertOne(finalAgentData);
+
+                return res.status(201).send({
+                    success: true,
+                    message: "Registration successful!",
+                    data: { _id: result.insertedId, ...finalAgentData }
+                });
+
+            } catch (error) {
+                console.error("Error in agent registration API:", error);
+                return res.status(500).send({
+                    error: true,
+                    message: "Internal Server Error"
+                });
             }
-        } 
-        
-        // ২. যদি গুগল সাইন-ইন বা এক্সটার্নাল ইমেজ URL হয়
-        if (!finalAvatarUrl) {
-            if (avatar || req.body.image || req.user?.picture) {
-                finalAvatarUrl = avatar || req.body.image || req.user?.picture;
-            } else {
-                // ৩. কোনোটিই না থাকলে ডিফল্ট প্লেসহোল্ডার
-                finalAvatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80";
-            }
-        }
-
-        const fullName = `${firstName || ''} ${lastName || ''}`.trim();
-
-        const finalAgentData = {
-            agentId: finalAgentId,
-            name: fullName,
-            firstName: firstName || fullName.split(' ')[0] || "",
-            lastName: lastName || fullName.split(' ').slice(1).join(' ') || "",
-            email: finalEmail,
-            avatar: finalAvatarUrl,
-            authProvider: authProvider || (req.user?.firebase?.sign_in_provider === 'google.com' ? 'google' : 'email'),
-            paymentStatus: 'pending',
-            createdAt: new Date()
-        };
-
-        const result = await agentsCollection.insertOne(finalAgentData);
-
-        return res.status(201).send({
-            success: true,
-            message: "Registration successful!",
-            data: { _id: result.insertedId, ...finalAgentData }
         });
-
-    } catch (error) {
-        console.error("Error in agent registration API:", error);
-        return res.status(500).send({
-            error: true,
-            message: "Internal Server Error"
-        });
-    }
-});
 
 
         // 🚀 POST: /api/bookings
@@ -1209,192 +1209,261 @@ app.get('/agents', async (req, res) => {
 
         // -------------------------Stripe checkout session ----------------------
 
-//         app.post('/create-checkout-session', async (req, res) => {
-//     try {
-//         const paymentInfo = req.body;
-//         // console.log(paymentInfo);
+        //         app.post('/create-checkout-session', async (req, res) => {
+        //     try {
+        //         const paymentInfo = req.body;
+        //         // console.log(paymentInfo);
 
-//         const price = parseInt(paymentInfo.planDetails.price) * 100;
+        //         const price = parseInt(paymentInfo.planDetails.price) * 100;
 
-//         // 1. Calculate Start Date & End Date
-//         const startDate = paymentInfo.createdAt ? new Date(paymentInfo.createdAt) : new Date();
-//         const endDate = new Date(startDate);
+        //         // 1. Calculate Start Date & End Date
+        //         const startDate = paymentInfo.createdAt ? new Date(paymentInfo.createdAt) : new Date();
+        //         const endDate = new Date(startDate);
 
-//         // Plan Duration (monthly/yearly) base kore End Date set
-//         if (paymentInfo.planDetails.duration === 'yearly') {
-//             endDate.setFullYear(endDate.getFullYear() + 1);
-//         } else {
-//             // Default 1 Month Add
-//             endDate.setMonth(endDate.getMonth() + 1);
-//         }
+        //         // Plan Duration (monthly/yearly) base kore End Date set
+        //         if (paymentInfo.planDetails.duration === 'yearly') {
+        //             endDate.setFullYear(endDate.getFullYear() + 1);
+        //         } else {
+        //             // Default 1 Month Add
+        //             endDate.setMonth(endDate.getMonth() + 1);
+        //         }
 
-//         // 2. Set Property Limits based on plan (Need customized rules if plans vary)
-//         const propertyLimit = paymentInfo.planDetails.limits.listings || 10; 
+        //         // 2. Set Property Limits based on plan (Need customized rules if plans vary)
+        //         const propertyLimit = paymentInfo.planDetails.limits.listings || 10; 
 
-//         const session = await stripe.checkout.sessions.create({
-//             ui_mode: "hosted_page",
-//             line_items: [
-//                 {
-//                     price_data: {
-//                         currency: 'USD',
-//                         unit_amount: price,
-//                         product_data: {
-//                             name: paymentInfo.planDetails.planName
-//                         },
-//                     },
-//                     quantity: 1,
-//                 },
-//             ],
-//             customer_email: paymentInfo.customer.senderEmail,
-//             mode: 'payment',
-//             metadata: {
-//                 agentName: paymentInfo.customer.fullName || '',
-//                 agencyName: paymentInfo.customer.agencyName || '',
-//                 whatsappNumber: paymentInfo.customer.whatsappNumber || '',
-//                 senderEmail: paymentInfo.customer.senderEmail || '',
-//                 subdomain: paymentInfo.domainConfig.customUsername || '',
-//                 planName: paymentInfo.planDetails.planName || '',
-//                 targetAddress: paymentInfo.domainConfig.targetAddress || '',
-//                 planPrice: paymentInfo.planDetails.price ? paymentInfo.planDetails.price.toString() : '0',
-//                 planDuration: paymentInfo.planDetails.duration || 'monthly',
-//                 startDate: startDate.toISOString(),
-//                 endDate: endDate.toISOString(),            
-//                 propertyLimit: propertyLimit.toString(),   
-//                 listedProperty: '0'                         
-//             },
-//             success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-//             cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
-//         });
+        //         const session = await stripe.checkout.sessions.create({
+        //             ui_mode: "hosted_page",
+        //             line_items: [
+        //                 {
+        //                     price_data: {
+        //                         currency: 'USD',
+        //                         unit_amount: price,
+        //                         product_data: {
+        //                             name: paymentInfo.planDetails.planName
+        //                         },
+        //                     },
+        //                     quantity: 1,
+        //                 },
+        //             ],
+        //             customer_email: paymentInfo.customer.senderEmail,
+        //             mode: 'payment',
+        //             metadata: {
+        //                 agentName: paymentInfo.customer.fullName || '',
+        //                 agencyName: paymentInfo.customer.agencyName || '',
+        //                 whatsappNumber: paymentInfo.customer.whatsappNumber || '',
+        //                 senderEmail: paymentInfo.customer.senderEmail || '',
+        //                 subdomain: paymentInfo.domainConfig.customUsername || '',
+        //                 planName: paymentInfo.planDetails.planName || '',
+        //                 targetAddress: paymentInfo.domainConfig.targetAddress || '',
+        //                 planPrice: paymentInfo.planDetails.price ? paymentInfo.planDetails.price.toString() : '0',
+        //                 planDuration: paymentInfo.planDetails.duration || 'monthly',
+        //                 startDate: startDate.toISOString(),
+        //                 endDate: endDate.toISOString(),            
+        //                 propertyLimit: propertyLimit.toString(),   
+        //                 listedProperty: '0'                         
+        //             },
+        //             success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        //             cancel_url: `${process.env.SITE_DOMAIN}/payment-canclled`,
+        //         });
 
-//         console.log(session);
+        //         console.log(session);
 
-//         // Response sending single JSON object
-//         res.send({ url: session.url });
+        //         // Response sending single JSON object
+        //         res.send({ url: session.url });
 
-//     } catch (error) {
-//         console.error("Stripe Checkout Error:", error);
-//         res.status(500).send({ error: error.message });
-//     }
-// });
+        //     } catch (error) {
+        //         console.error("Stripe Checkout Error:", error);
+        //         res.status(500).send({ error: error.message });
+        //     }
+        // });
 
 
 
-// ---------------------------SSL Commerz Payment Setup---------------------- 
+        // ---------------------------SSL Commerz Payment Setup---------------------- 
 
-app.post('/create-checkout-session', async (req, res) => {
+        app.post('/create-checkout-session', async (req, res) => {
+            try {
+                const paymentInfo = req.body;
+                const agentEmail = paymentInfo.customer?.senderEmail;
+
+                if (!agentEmail) {
+                    return res.status(400).send({ error: true, message: "Agent email is required." });
+                }
+
+                // 🔒 VALIDATION 1: Check Active Subscription in Agents Collection
+                const existingAgent = await agentsCollection.findOne({ email: agentEmail });
+
+                if (existingAgent && existingAgent.paymentStatus === 'paid' && existingAgent.metadata?.endDate) {
+                    const currentDate = new Date();
+                    const planEndDate = new Date(existingAgent.metadata.endDate);
+
+                    if (planEndDate > currentDate) {
+                        return res.status(400).send({
+                            error: true,
+                            activePlan: true,
+                            message: `Apnar ekti active plan chaluk ache ja ${planEndDate.toLocaleDateString()} porjonto meyadi. Meyadh sesh hobar aage notun plan purchase kora jabe na.`
+                        });
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // Payment Payload & Dates Setup
+                // -------------------------------------------------------------
+                const totalAmount = parseFloat(paymentInfo.planDetails?.price || 0);
+                const tran_id = `TRAN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+                const startDate = new Date();
+                const endDate = new Date(startDate);
+
+                if (paymentInfo.planDetails?.duration === 'yearly') {
+                    endDate.setFullYear(endDate.getFullYear() + 1);
+                } else {
+                    endDate.setMonth(endDate.getMonth() + 1);
+                }
+
+                const propertyLimit = paymentInfo.planDetails?.limits?.listings || 10;
+
+                const customMetadata = {
+                    agencyName: paymentInfo.customer?.agencyName || '',
+                    agentName: paymentInfo.customer?.fullName || '',
+                    senderEmail: agentEmail,
+                    whatsappNumber: paymentInfo.customer?.whatsappNumber || '',
+                    subdomain: paymentInfo.domainConfig?.customUsername || '',
+                    targetAddress: paymentInfo.domainConfig?.targetAddress || '',
+                    planName: paymentInfo.planDetails?.planName || '',
+                    planPrice: paymentInfo.planDetails?.price ? paymentInfo.planDetails.price.toString() : '0',
+                    planDuration: paymentInfo.planDetails?.duration || 'monthly',
+                    startDate: startDate.toISOString(),
+                    endDate: endDate.toISOString(),
+                    propertyLimit: propertyLimit.toString(),
+                    listedProperty: '0'
+                };
+
+                // -------------------------------------------------------------
+                // 📦 Subscriptions Collection-e Entry (Initial Status: 'pending')
+                // -------------------------------------------------------------
+                const subscriptionDoc = {
+                    tran_id: tran_id,
+                    agentEmail: agentEmail,
+                    amount: totalAmount,
+                    paymentStatus: 'pending', // SSLCommerz-e jawar aage pending
+                    planDetails: paymentInfo.planDetails,
+                    customerDetails: paymentInfo.customer,
+                    domainConfig: paymentInfo.domainConfig,
+                    metadata: customMetadata,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                };
+
+                // Subscription Collection-e insert korbe
+                await subscriptionsCollection.insertOne(subscriptionDoc);
+
+                // -------------------------------------------------------------
+                // SSLCommerz Payload Setup
+                // -------------------------------------------------------------
+                const data = {
+                    total_amount: totalAmount,
+                    currency: 'BDT',
+                    tran_id: tran_id,
+                    success_url: `${process.env.SITE_DOMAIN}/api/payment-success?tran_id=${tran_id}`,
+                    fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${tran_id}`,
+                    cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${tran_id}`,
+                    ipn_url: `${process.env.SITE_DOMAIN}/api/payment-ipn`,
+
+                    shipping_method: 'NO',
+                    product_name: paymentInfo.planDetails?.planName || 'Agent Plan Subscription',
+                    product_category: 'Digital Service',
+                    product_profile: 'non-physical-goods',
+
+                    cus_name: paymentInfo.customer?.fullName || 'Valued Agent',
+                    cus_email: agentEmail,
+                    cus_add1: paymentInfo.customer?.agencyName || 'Dhaka',
+                    cus_add2: 'Dhaka',
+                    cus_city: 'Dhaka',
+                    cus_state: 'Dhaka',
+                    cus_postcode: '1000',
+                    cus_country: 'Bangladesh',
+                    cus_phone: paymentInfo.customer?.whatsappNumber || '01700000000',
+                    cus_fax: paymentInfo.customer?.whatsappNumber || '01700000000',
+
+                    ship_name: paymentInfo.customer?.fullName || 'Valued Agent',
+                    ship_add1: 'Dhaka',
+                    ship_add2: 'Dhaka',
+                    ship_city: 'Dhaka',
+                    ship_state: 'Dhaka',
+                    ship_postcode: 1000,
+                    ship_country: 'Bangladesh',
+
+                    value_a: tran_id // value_a te just tran_id rekhe dilam
+                };
+
+                const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
+
+                sslcz.init(data).then(apiResponse => {
+                    let GatewayPageURL = apiResponse.GatewayPageURL;
+
+                    if (GatewayPageURL) {
+                        res.status(200).send({ url: GatewayPageURL });
+                    } else {
+                        res.status(400).send({ error: true, message: "SSLCommerz Gateway URL generation failed." });
+                    }
+                });
+
+            } catch (error) {
+                console.error("SSLCommerz Payment Init Error:", error);
+                res.status(500).send({ error: true, message: error.message || "Internal Server Error" });
+            }
+        });
+
+
+        // create plan renewal  api  
+
+
+        app.post('/create-renew-session', async (req, res) => {
     try {
-        const paymentInfo = req.body;
-        const agentEmail = paymentInfo.customer?.senderEmail;
+        const { planDetails } = req.body;
+        console.log(planDetails);
+        const agentEmail = planDetails?.senderEmail;
 
         if (!agentEmail) {
             return res.status(400).send({ error: true, message: "Agent email is required." });
         }
 
-        // 🔒 VALIDATION 1: Check Active Subscription in Agents Collection
-        const existingAgent = await agentsCollection.findOne({ email: agentEmail });
+        const totalAmount = parseFloat(planDetails?.price || 0);
+        const new_tran_id = `RENEW_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-        if (existingAgent && existingAgent.paymentStatus === 'paid' && existingAgent.metadata?.endDate) {
-            const currentDate = new Date();
-            const planEndDate = new Date(existingAgent.metadata.endDate);
-
-            if (planEndDate > currentDate) {
-                return res.status(400).send({
-                    error: true,
-                    activePlan: true,
-                    message: `Apnar ekti active plan chaluk ache ja ${planEndDate.toLocaleDateString()} porjonto meyadi. Meyadh sesh hobar aage notun plan purchase kora jabe na.`
-                });
-            }
-        }
-
-        // -------------------------------------------------------------
-        // Payment Payload & Dates Setup
-        // -------------------------------------------------------------
-        const totalAmount = parseFloat(paymentInfo.planDetails?.price || 0);
-        const tran_id = `TRAN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-        const startDate = new Date();
-        const endDate = new Date(startDate);
-
-        if (paymentInfo.planDetails?.duration === 'yearly') {
-            endDate.setFullYear(endDate.getFullYear() + 1);
-        } else {
-            endDate.setMonth(endDate.getMonth() + 1);
-        }
-
-        const propertyLimit = paymentInfo.planDetails?.limits?.listings || 10;
-
-        const customMetadata = {
-            agencyName: paymentInfo.customer?.agencyName || '',
-            agentName: paymentInfo.customer?.fullName || '',
-            senderEmail: agentEmail,
-            whatsappNumber: paymentInfo.customer?.whatsappNumber || '',
-            subdomain: paymentInfo.domainConfig?.customUsername || '',
-            targetAddress: paymentInfo.domainConfig?.targetAddress || '',
-            planName: paymentInfo.planDetails?.planName || '',
-            planPrice: paymentInfo.planDetails?.price ? paymentInfo.planDetails.price.toString() : '0',
-            planDuration: paymentInfo.planDetails?.duration || 'monthly',
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            propertyLimit: propertyLimit.toString(),
-            listedProperty: '0'
+        const renewalInfo = {
+            renewal_id : new_tran_id,
+            planDetails:planDetails,
+            renewalStatus:false
         };
 
-        // -------------------------------------------------------------
-        // 📦 Subscriptions Collection-e Entry (Initial Status: 'pending')
-        // -------------------------------------------------------------
-        const subscriptionDoc = {
-            tran_id: tran_id,
-            agentEmail: agentEmail,
-            amount: totalAmount,
-            paymentStatus: 'pending', // SSLCommerz-e jawar aage pending
-            planDetails: paymentInfo.planDetails,
-            customerDetails: paymentInfo.customer,
-            domainConfig: paymentInfo.domainConfig,
-            metadata: customMetadata,
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
+        await subscriptionsCollection.insertOne(renewalInfo);
 
-        // Subscription Collection-e insert korbe
-        await subscriptionsCollection.insertOne(subscriptionDoc);
-
-        // -------------------------------------------------------------
-        // SSLCommerz Payload Setup
-        // -------------------------------------------------------------
+        // 📌 SSLCommerz Payload Setup
         const data = {
             total_amount: totalAmount,
             currency: 'BDT',
-            tran_id: tran_id,
-            success_url: `${process.env.SITE_DOMAIN}/api/payment-success?tran_id=${tran_id}`,
-            fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${tran_id}`,
-            cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${tran_id}`,
+            tran_id: new_tran_id,
+            success_url: `${process.env.SITE_DOMAIN}/api/renewal-success?tran_id=${new_tran_id}`,
+            fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${new_tran_id}`,
+            cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${new_tran_id}`,
             ipn_url: `${process.env.SITE_DOMAIN}/api/payment-ipn`,
 
             shipping_method: 'NO',
-            product_name: paymentInfo.planDetails?.planName || 'Agent Plan Subscription',
+            product_name: `Renewal: ${planDetails?.planName || 'Agent Plan'}`,
             product_category: 'Digital Service',
             product_profile: 'non-physical-goods',
 
-            cus_name: paymentInfo.customer?.fullName || 'Valued Agent',
+            cus_name: 'Valued Agent',
             cus_email: agentEmail,
-            cus_add1: paymentInfo.customer?.agencyName || 'Dhaka',
-            cus_add2: 'Dhaka',
+            cus_add1: 'Dhaka',
             cus_city: 'Dhaka',
-            cus_state: 'Dhaka',
             cus_postcode: '1000',
             cus_country: 'Bangladesh',
-            cus_phone: paymentInfo.customer?.whatsappNumber || '01700000000',
-            cus_fax: paymentInfo.customer?.whatsappNumber || '01700000000',
+            cus_phone: '01700000000',
 
-            ship_name: paymentInfo.customer?.fullName || 'Valued Agent',
-            ship_add1: 'Dhaka',
-            ship_add2: 'Dhaka',
-            ship_city: 'Dhaka',
-            ship_state: 'Dhaka',
-            ship_postcode: 1000,
-            ship_country: 'Bangladesh',
-
-            value_a: tran_id // value_a te just tran_id rekhe dilam
+            
         };
 
         const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
@@ -1410,193 +1479,129 @@ app.post('/create-checkout-session', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("SSLCommerz Payment Init Error:", error);
+        console.error("Renewal Init Error:", error);
         res.status(500).send({ error: true, message: error.message || "Internal Server Error" });
     }
 });
 
 
-// create plan renewal  api  
 
+//    ssl commerz payment success 
 
-app.post('/create-renew-session', async (req, res) => {
-    try {
-        const renewalInfo = req.body;
-       
-        const agentEmail = renewalInfo.planDetails.senderEmail;
-        console.log(agentEmail);
-        
+        app.post('/api/payment-success', async (req, res) => {
+            try {
+                const tran_id = req.query.tran_id || req.body.tran_id;
 
-        const query = {agentEmail: agentEmail};
-        console.log(query);
-        const updatedData = {
-            $set: {
-                amount:renewalInfo.planDetails.price,
-            }
-        }
-        const options ={};
-        const result = await subscriptionsCollection.updateOne(query,updatedData,options);
-
-
-
-        console.log(result);
-
-
-
-
-
-        // if (!agentEmail) {
-        //     return res.status(400).send({ error: true, message: "Agent email is required." });
-        // }
-
-        // // 🔒 VALIDATION 1: Check Active Subscription in Agents Collection
-        // const existingAgent = await agentsCollection.findOne({ email: agentEmail });
-
-        // if (existingAgent && existingAgent.paymentStatus === 'paid' && existingAgent.metadata?.endDate) {
-        //     const currentDate = new Date();
-        //     const planEndDate = new Date(existingAgent.metadata.endDate);
-
-        //     if (planEndDate > currentDate) {
-        //         return res.status(400).send({
-        //             error: true,
-        //             activePlan: true,
-        //             message: `Apnar ekti active plan chaluk ache ja ${planEndDate.toLocaleDateString()} porjonto meyadi. Meyadh sesh hobar aage notun plan purchase kora jabe na.`
-        //         });
-        //     }
-        // }
-
-        // -------------------------------------------------------------
-        // Payment Payload & Dates Setup
-        // -------------------------------------------------------------
-        // const totalAmount = parseFloat(renewalInfo.planDetails?.price || 0);
-        // const tran_id = `TRAN_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-        // const startDate = new Date();
-        // const endDate = new Date(startDate);
-
-        // if (renewalInfo.planDetails?.duration === 'yearly') {
-        //     endDate.setFullYear(endDate.getFullYear() + 1);
-        // } else {
-        //     endDate.setMonth(endDate.getMonth() + 1);
-        // }
-
-        // const propertyLimit = renewalInfo.planDetails?.limits?.listings || 10;
-
-   
-
-        
-      
-        // -------------------------------------------------------------
-        // SSLCommerz Payload Setup
-        // -------------------------------------------------------------
-        // const data = {
-        //     total_amount: totalAmount,
-        //     currency: 'BDT',
-        //     tran_id: tran_id,
-        //     success_url: `${process.env.SITE_DOMAIN}/api/payment-success?tran_id=${tran_id}`,
-        //     fail_url: `${process.env.SITE_DOMAIN}/api/payment-fail?tran_id=${tran_id}`,
-        //     cancel_url: `${process.env.SITE_DOMAIN}/api/payment-cancel?tran_id=${tran_id}`,
-        //     ipn_url: `${process.env.SITE_DOMAIN}/api/payment-ipn`,
-
-        //     shipping_method: 'NO',
-        //     product_name: renewalInfo.planDetails?.planName || 'Agent Plan Subscription',
-        //     product_category: 'Digital Service',
-        //     product_profile: 'non-physical-goods',
-
-        //     cus_name: renewalInfo.customer?.fullName || 'Valued Agent',
-        //     cus_email: agentEmail,
-        //     cus_add1: renewalInfo.customer?.agencyName || 'Dhaka',
-        //     cus_add2: 'Dhaka',
-        //     cus_city: 'Dhaka',
-        //     cus_state: 'Dhaka',
-        //     cus_postcode: '1000',
-        //     cus_country: 'Bangladesh',
-        //     cus_phone: renewalInfo.customer?.whatsappNumber || '01700000000',
-        //     cus_fax: renewalInfo.customer?.whatsappNumber || '01700000000',
-
-        //     ship_name: renewalInfo.customer?.fullName || 'Valued Agent',
-        //     ship_add1: 'Dhaka',
-        //     ship_add2: 'Dhaka',
-        //     ship_city: 'Dhaka',
-        //     ship_state: 'Dhaka',
-        //     ship_postcode: 1000,
-        //     ship_country: 'Bangladesh',
-
-        //     value_a: tran_id // value_a te just tran_id rekhe dilam
-        // };
-
-        // const sslcz = new SSLCommerzPayment(store_id, store_passwd, is_live);
-
-        // sslcz.init(data).then(apiResponse => {
-        //     let GatewayPageURL = apiResponse.GatewayPageURL;
-
-        //     if (GatewayPageURL) {
-        //         res.status(200).send({ url: GatewayPageURL });
-        //     } else {
-        //         res.status(400).send({ error: true, message: "SSLCommerz Gateway URL generation failed." });
-        //     }
-        // });
-
-    } catch (error) {
-        // console.error("SSLCommerz Payment Init Error:", error);
-        // res.status(500).send({ error: true, message: error.message || "Internal Server Error" });
-    }
-});
-
-
-
-
-
-app.post('/api/payment-success', async (req, res) => {
-    try {
-        const tran_id = req.query.tran_id || req.body.tran_id;
-
-        if (!tran_id) {
-            return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Transaction ID missing`);
-        }
-
-        // 📌 Step 1: Subscriptions Collection theke tran_id diye data khuje ber kora
-        const subscription = await subscriptionsCollection.findOne({ tran_id: tran_id });
-
-        if (!subscription) {
-            return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Subscription record not found`);
-        }
-
-        const { agentEmail, metadata } = subscription;
-
-        // 📌 Step 2: Subscriptions Collection-e paymentStatus 'paid' kora
-        await subscriptionsCollection.updateOne(
-            { tran_id: tran_id },
-            {
-                $set: {
-                    paymentStatus: 'paid',
-                    updatedAt: new Date()
+                if (!tran_id) {
+                    return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Transaction ID missing`);
                 }
-            }
-        );
 
-        // 📌 Step 3: Agent Collection-e status 'paid' & Metadata Merge/Update kora
-        await agentsCollection.updateOne(
-            { email: agentEmail },
-            {
-                $set: {
-                    paymentStatus: 'paid',
-                    subscriptionTranId: tran_id,
-                    metadata: metadata,
-                    updatedAt: new Date()
+                // 📌 Step 1: Subscriptions Collection theke tran_id diye data khuje ber kora
+                const subscription = await subscriptionsCollection.findOne({ tran_id: tran_id });
+
+                if (!subscription) {
+                    return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Subscription record not found`);
                 }
-            },
-            { upsert: true } // Agent db te na thakle new agent document toiri hoye jabe
-        );
 
-        // 📌 Step 4: Success page-e Frontend-e redirect kora
-        return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-success?tran_id=${tran_id}`);
+                const { agentEmail, metadata } = subscription;
 
-    } catch (error) {
-        console.error("Payment Success Handler Error:", error);
-        return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Internal Server Error`);
-    }
-});
+                // 📌 Step 2: Subscriptions Collection-e paymentStatus 'paid' kora
+                await subscriptionsCollection.updateOne(
+                    { tran_id: tran_id },
+                    {
+                        $set: {
+                            paymentStatus: 'paid',
+                            updatedAt: new Date()
+                        }
+                    }
+                );
+
+                // 📌 Step 3: Agent Collection-e status 'paid' & Metadata Merge/Update kora
+                await agentsCollection.updateOne(
+                    { email: agentEmail },
+                    {
+                        $set: {
+                            paymentStatus: 'paid',
+                            subscriptionTranId: tran_id,
+                            metadata: metadata,
+                            updatedAt: new Date()
+                        }
+                    },
+                    { upsert: true } // Agent db te na thakle new agent document toiri hoye jabe
+                );
+
+                // 📌 Step 4: Success page-e Frontend-e redirect kora
+                return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-success?tran_id=${tran_id}`);
+
+            } catch (error) {
+                console.error("Payment Success Handler Error:", error);
+                return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Internal Server Error`);
+            }
+        });
+
+
+
+        // renewal success api 
+
+
+app.post('/api/renewal-success', async (req, res) => {
+            try {
+                const tran_id = req.query.tran_id || req.body.tran_id;
+                console.log(tran_id);
+
+                if (!tran_id) {
+                    return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Transaction ID missing`);
+                }
+
+
+                const renewalInfo = await subscriptionsCollection.findOne({ renewal_id: tran_id });
+
+                const senderEmail= renewalInfo.senderEmail;
+                console.log(renewalInfo);
+
+
+                // 📌 Step 1: Subscriptions Collection theke tran_id diye data khuje ber kora
+                const subscription = await subscriptionsCollection.findOne({ agentEmail:senderEmail });
+
+                if (!subscription) {
+                    return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Subscription record not found`);
+                }
+
+                // const { agentEmail, metadata } = subscription;
+
+                // 📌 Step 2: Subscriptions Collection-e paymentStatus 'paid' kora
+                // await subscriptionsCollection.updateOne(
+                //     { tran_id: tran_id },
+                //     {
+                //         $set: {
+                //             paymentStatus: 'paid',
+                //             updatedAt: new Date()
+                //         }
+                //     }
+                // );
+
+                // 📌 Step 3: Agent Collection-e status 'paid' & Metadata Merge/Update kora
+                // await agentsCollection.updateOne(
+                //     { email: agentEmail },
+                //     {
+                //         $set: {
+                //             paymentStatus: 'paid',
+                //             subscriptionTranId: tran_id,
+                //             metadata: metadata,
+                //             updatedAt: new Date()
+                //         }
+                //     },
+                //     { upsert: true } // Agent db te na thakle new agent document toiri hoye jabe
+                // );
+
+                // 📌 Step 4: Success page-e Frontend-e redirect kora
+                return res.redirect(`${process.env.FRONTEND_DOMAIN}`);
+
+            } catch (error) {
+                console.error("Payment Success Handler Error:", error);
+                return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Internal Server Error`);
+            }
+        });
 
 
         // ------------------------------------------------------------------
@@ -1965,45 +1970,45 @@ app.post('/api/payment-success', async (req, res) => {
 
 
 
-         app.patch('/session-status', async (req, res) => {
-    try {
-        const { sessionId } = req.query;
+        app.patch('/session-status', async (req, res) => {
+            try {
+                const { sessionId } = req.query;
 
-        if (!sessionId) {
-            return res.status(400).send({ error: true, message: "Session ID is required" });
-        }
+                if (!sessionId) {
+                    return res.status(400).send({ error: true, message: "Session ID is required" });
+                }
 
-        // ১. Stripe থেকে Checkout Session ফেচ করা
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
+                // ১. Stripe থেকে Checkout Session ফেচ করা
+                const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-        // ২. পেমেন্ট সফল হয়েছে কিনা চেক করা
-        if (session.payment_status === 'paid') {
-            const metadata = session.metadata || {};
-            const senderEmail = metadata.senderEmail; // Stripe metadata থেকে ইমেইল আনা
+                // ২. পেমেন্ট সফল হয়েছে কিনা চেক করা
+                if (session.payment_status === 'paid') {
+                    const metadata = session.metadata || {};
+                    const senderEmail = metadata.senderEmail; // Stripe metadata থেকে ইমেইল আনা
 
-            if (senderEmail) {
-                // ৩. MongoDB-তে email matches senderEmail কন্ডিশনে updateOne চালানো
-                await agentsCollection.updateOne(
-                    { email: senderEmail }, // কোয়েরি ম্যাচিং
-                    { 
-                        $set: { 
-                            metadata: metadata, // আগের ডাটার সাথে metadata অবজেক্ট অ্যাড বা আপডেট করা
-                            paymentStatus: 'paid',
-                            updatedAt: new Date()
-                        } 
+                    if (senderEmail) {
+                        // ৩. MongoDB-তে email matches senderEmail কন্ডিশনে updateOne চালানো
+                        await agentsCollection.updateOne(
+                            { email: senderEmail }, // কোয়েরি ম্যাচিং
+                            {
+                                $set: {
+                                    metadata: metadata, // আগের ডাটার সাথে metadata অবজেক্ট অ্যাড বা আপডেট করা
+                                    paymentStatus: 'paid',
+                                    updatedAt: new Date()
+                                }
+                            }
+                        );
                     }
-                );
+                }
+
+                // ৪. ফ্রন্টএন্ডে metadata রিটার্ন করা
+                res.status(200).send(session.metadata);
+
+            } catch (error) {
+                console.error("Error updating session status:", error);
+                res.status(500).send({ error: true, message: error.message });
             }
-        }
-
-        // ৪. ফ্রন্টএন্ডে metadata রিটার্ন করা
-        res.status(200).send(session.metadata);
-
-    } catch (error) {
-        console.error("Error updating session status:", error);
-        res.status(500).send({ error: true, message: error.message });
-    }
-});
+        });
 
 
 
