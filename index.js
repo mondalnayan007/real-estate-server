@@ -1423,7 +1423,7 @@ async function connectToMongoDB() {
         app.post('/create-renew-session', async (req, res) => {
             try {
                 const { planDetails } = req.body;
-                console.log(planDetails);
+                
                 const agentEmail = planDetails?.senderEmail;
 
                 if (!agentEmail) {
@@ -1548,7 +1548,7 @@ async function connectToMongoDB() {
         app.post('/api/renewal-success', async (req, res) => {
             try {
                 const tran_id = req.query.tran_id || req.body.tran_id;
-                console.log(tran_id);
+                
 
                 if (!tran_id) {
                     return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Transaction ID missing`);
@@ -1556,14 +1556,15 @@ async function connectToMongoDB() {
 
 
                 const renewalInfo = await subscriptionsCollection.findOne({ renewal_id: tran_id });
-
+           
+             
                 const senderEmail = renewalInfo.planDetails.senderEmail;
 
 
 
                 // 📌 Step 1: Subscriptions Collection theke tran_id diye data khuje ber kora
                 const subscription = await subscriptionsCollection.findOne({ agentEmail: senderEmail });
-                console.log('renewal data :', renewalInfo, 'subscription data :', subscription);
+                
 
                 if (!subscription) {
                     return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Subscription record not found`);
@@ -1587,7 +1588,7 @@ async function connectToMongoDB() {
                             'planDetails.duration': renewalInfo.planDetails.duration,
                             'planDetails.limits.listings': renewalInfo.planDetails.limits.listings,
                             'metadata.planName': renewalInfo.planDetails.planName,
-                            'metadata.planPrice': renewalInfo.planDetails.planPrice,
+                            'metadata.planPrice': renewalInfo.planDetails.price,
                             'metadata.planDuration': renewalInfo.planDetails.duration,
                             'metadata.startDate': startDate,
                             'metadata.endDate': endDate,
@@ -1600,18 +1601,34 @@ async function connectToMongoDB() {
                 );
 
                 // 📌 Step 3: Agent Collection-e status 'paid' & Metadata Merge/Update kora
-                // await agentsCollection.updateOne(
-                //     { email: agentEmail },
-                //     {
-                //         $set: {
-                //             paymentStatus: 'paid',
-                //             subscriptionTranId: tran_id,
-                //             metadata: metadata,
-                //             updatedAt: new Date()
-                //         }
-                //     },
-                //     { upsert: true } // Agent db te na thakle new agent document toiri hoye jabe
-                // );
+                await agentsCollection.updateOne(
+                    { email: senderEmail },
+                    {
+                        $set: {
+                            'metadata.planName': renewalInfo.planDetails.planName,
+                            'metadata.planPrice': renewalInfo.planDetails.price,
+                            'metadata.planDuration': renewalInfo.planDetails.duration,
+                            'metadata.startDate': startDate,
+                            'metadata.endDate': endDate,
+                            'metadata.propertyLimit': renewalInfo.planDetails.limits.listings,
+
+                        }
+                    },
+                    { upsert: true } // Agent db te na thakle new agent document toiri hoye jabe
+                );
+
+
+
+                await subscriptionsCollection.updateOne({ renewal_id: tran_id },
+                    {
+                        $set:{
+                            renewalStatus:true,
+                            updatedAt: new Date()
+
+                        }
+                    }
+
+                )
 
                 // 📌 Step 4: Success page-e Frontend-e redirect kora
                 return res.redirect(`${process.env.FRONTEND_DOMAIN}`);
