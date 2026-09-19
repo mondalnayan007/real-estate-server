@@ -130,15 +130,15 @@ async function connectToMongoDB() {
 
         // get  subscription  data
 
-       app.get('/api/subscriptions', async (req, res) => {
-  try {
-    const query = { paymentStatus: 'paid' };
-    const result = await subscriptionsCollection.find(query).toArray();
-    res.send(result);
-  } catch (error) {
-    res.status(500).send({ message: error.message });
-  }
-});
+        app.get('/api/subscriptions', async (req, res) => {
+            try {
+                
+                const result = await subscriptionsCollection.find().toArray();
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ message: error.message });
+            }
+        });
 
 
         // get all the agents data 
@@ -1429,7 +1429,7 @@ async function connectToMongoDB() {
         app.post('/create-renew-session', async (req, res) => {
             try {
                 const { planDetails } = req.body;
-                
+
                 const agentEmail = planDetails?.senderEmail;
 
                 if (!agentEmail) {
@@ -1554,7 +1554,7 @@ async function connectToMongoDB() {
         app.post('/api/renewal-success', async (req, res) => {
             try {
                 const tran_id = req.query.tran_id || req.body.tran_id;
-                
+
 
                 if (!tran_id) {
                     return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Transaction ID missing`);
@@ -1562,15 +1562,15 @@ async function connectToMongoDB() {
 
 
                 const renewalInfo = await subscriptionsCollection.findOne({ renewal_id: tran_id });
-           
-             
+
+
                 const senderEmail = renewalInfo.planDetails.senderEmail;
 
 
 
                 // 📌 Step 1: Subscriptions Collection theke tran_id diye data khuje ber kora
                 const subscription = await subscriptionsCollection.findOne({ agentEmail: senderEmail });
-                
+
 
                 if (!subscription) {
                     return res.redirect(`${process.env.FRONTEND_DOMAIN}/payment-fail?message=Subscription record not found`);
@@ -1627,8 +1627,8 @@ async function connectToMongoDB() {
 
                 await subscriptionsCollection.updateOne({ renewal_id: tran_id },
                     {
-                        $set:{
-                            renewalStatus:true,
+                        $set: {
+                            renewalStatus: true,
                             updatedAt: new Date()
 
                         }
