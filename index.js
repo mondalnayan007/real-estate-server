@@ -128,11 +128,17 @@ async function connectToMongoDB() {
         })
 
 
-        // get  testimonial data
+        // get  subscription  data
 
-        app.get('/testimonial', async (req, res) => {
-
-        })
+       app.get('/api/subscriptions', async (req, res) => {
+  try {
+    const query = { paymentStatus: 'paid' };
+    const result = await subscriptionsCollection.find(query).toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: error.message });
+  }
+});
 
 
         // get all the agents data 
