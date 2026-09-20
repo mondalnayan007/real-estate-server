@@ -132,7 +132,7 @@ async function connectToMongoDB() {
 
         app.get('/api/subscriptions', async (req, res) => {
             try {
-                
+
                 const result = await subscriptionsCollection.find().toArray();
                 res.send(result);
             } catch (error) {
@@ -726,12 +726,19 @@ async function connectToMongoDB() {
 
                 // ৫. ডাটাবেজে ইনসার্ট
                 const result = await projectsCollection.insertOne(finalProjectData);
+                const agentData = await agentsCollection.findOne( { agentId: agentId });
+
+                await agentsCollection.updateOne(
+                    { agentId: agentId }, // আপনার agentId string হলে ObjectId() এ র‍্যাপ করে নিবেন
+                    { $inc: { "metadata.listedProperty": 1 } }
+                );
 
                 // ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ অবজেক্ট পাঠানো
                 const savedProject = {
                     _id: result.insertedId,
                     ...finalProjectData
                 };
+
 
                 res.status(201).send(savedProject);
 
@@ -1343,7 +1350,7 @@ async function connectToMongoDB() {
                     startDate: startDate.toISOString(),
                     endDate: endDate.toISOString(),
                     propertyLimit: propertyLimit.toString(),
-                    listedProperty: '0'
+                    listedProperty: Number(0)
                 };
 
                 // -------------------------------------------------------------
