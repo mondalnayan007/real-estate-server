@@ -723,15 +723,20 @@ async function connectToMongoDB() {
 
                     createdAt: new Date()
                 };
+             
 
                 // ৫. ডাটাবেজে ইনসার্ট
                 const result = await projectsCollection.insertOne(finalProjectData);
-                const agentData = await agentsCollection.findOne( { agentId: agentId });
+                const agentData = await agentsCollection.findOne({ agentId: agentId });
+                console.log(agentData);
+                console.log("Incoming agentId from frontend:", agentId);
 
-                await agentsCollection.updateOne(
-                    { agentId: agentId }, // আপনার agentId string হলে ObjectId() এ র‍্যাপ করে নিবেন
+                const updateResult = await agentsCollection.updateOne(
+                    { agentId: agentId },
                     { $inc: { "metadata.listedProperty": 1 } }
                 );
+                console.log("Matched Agent Count:", updateResult.matchedCount);
+console.log("Modified Count:", updateResult.modifiedCount);
 
                 // ফ্রন্টএন্ডে রিয়েল-টাইম আপডেটের জন্য আইডি সহ অবজেক্ট পাঠানো
                 const savedProject = {
@@ -1350,7 +1355,7 @@ async function connectToMongoDB() {
                     startDate: startDate.toISOString(),
                     endDate: endDate.toISOString(),
                     propertyLimit: propertyLimit.toString(),
-                    listedProperty: Number(0)
+                    listedProperty: 0
                 };
 
                 // -------------------------------------------------------------
